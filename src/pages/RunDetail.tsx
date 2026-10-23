@@ -114,6 +114,7 @@ export default function RunDetail({ ctx, id }: { ctx: Ctx; id: string }) {
             <div className="counts">
               <div><b className="add">{s.add}</b>add</div><div><b className="chg">{s.change}</b>change</div>
               <div><b className="del">{s.destroy}</b>destroy</div><div><b className="del">{s.replace}</b>replace</div>
+              {!!s.imports && <div><b className="chg">{s.imports}</b>import</div>}
             </div>
           ) : <p className="muted">{active.includes(run.status) ? "Waiting for the runner…" : "No plan."}</p>}
         </div>
@@ -155,7 +156,7 @@ export default function RunDetail({ ctx, id }: { ctx: Ctx; id: string }) {
             <tbody>{s.resources.map(r => (
               <tr key={r.address}>
                 <td className="mono small">{r.address}</td><td className="mono small">{r.type}</td>
-                <td><span className={r.actions.length === 2 ? "del" : r.actions[0] === "create" ? "add" : r.actions[0] === "delete" ? "del" : "chg"}>{r.actions.join(" → ")}</span></td>
+                <td><span className={r.actions.length === 2 ? "del" : r.actions[0] === "create" ? "add" : r.actions[0] === "delete" ? "del" : "chg"}>{r.actions.join(" → ")}</span>{r.importing && r.actions[0] !== "import" && <span className="badge wait" style={{ marginLeft: 6 }}>imported</span>}</td>
               </tr>))}
             </tbody>
           </table>

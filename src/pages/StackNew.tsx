@@ -41,6 +41,7 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof api.preview>> | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [seq, setSeq] = useState(1);
+  const [imports, setImports] = useState("");
 
   const environment = envs.data?.find(e => e.name === env);
   const cloud = environment?.cloud.provider ?? "";
@@ -71,6 +72,11 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
       }
       spec.modules.push({ name: inst.name, module: inst.module, version: inst.version, inputs });
       for (const o of inst.outputs) spec.outputs!.push({ name: `${inst.name}_${o}`.replace(/-/g, "_").slice(0, 40), module: inst.name, output: o });
+    }
+    for (const line of imports.split("\n").map(l => l.trim()).filter(Boolean)) {
+      const i = line.indexOf("=");
+      if (i < 0) { problems.push(`import "${line}" must look like: module.name.type.resource = cloud-id`); continue; }
+      (spec.imports ??= []).push({ to: line.slice(0, i).trim(), id: line.slice(i + 1).trim() });
     }
     if (problems.length) { setError(Object.assign(new Error("Fix these fields"), { status: 0, details: problems })); return null; }
     return spec;
@@ -168,6 +174,13 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
         </div>
       )}
 
+      {env && instances.length > 0 && (
+        <div className="panel">
+          <h2>Import existing resources <span className="muted small">(optional — backporting)</span></h2>
+          <p className="muted small">Adopt resources that already exist in the cloud instead of creating them. One per line: an address inside one of the modules above, then its cloud ID. Imports raise the run's risk, and an import the plan would replace is blocked.</p>
+          <textarea value={imports} onChange={e => setImports(e.target.value)} placeholder={"module.network.aws_vpc.this[0] = vpc-0a1b2c3d4e5f67890"} spellCheck={false} />
+        </div>
+      )}
       <ErrorBox error={error} />
       {preview && !preview.valid && <div className="error"><strong>The spec was rejected</strong><ul>{preview.problems?.map((p, i) => <li key={i}>{p}</li>)}</ul></div>}
       {preview?.valid && (

@@ -32,14 +32,14 @@ export interface Environment {
 }
 
 export interface ModuleRef { name: string; module: string; version?: string; inputs?: Record<string, unknown> }
-export interface StackSpec { modules: ModuleRef[]; outputs?: { name: string; module: string; output: string; sensitive?: boolean }[] }
+export interface StackSpec { modules: ModuleRef[]; outputs?: { name: string; module: string; output: string; sensitive?: boolean }[]; imports?: { to: string; id: string }[] }
 export interface RunBrief { id: string; status: string; operation: string; created_at: string }
 export interface Stack {
   id: string; name: string; bu: string; entity: string; environment: string; environment_id: string; spec: StackSpec;
   created_by: string; created_at: string; updated_at: string; last_run?: RunBrief;
 }
 
-export interface ResourceChange { address: string; type: string; actions: string[]; after?: Record<string, unknown> }
+export interface ResourceChange { address: string; type: string; actions: string[]; importing?: boolean; after?: Record<string, unknown> }
 export interface Violation { rule: string; level: "hard" | "advisory"; address?: string; message: string }
 export interface Approval { step: Step; approver: string; reason: string; created_at: string }
 export interface Risk { level: "low" | "medium" | "high"; reasons: string[]; required_approvals: Step[] }
@@ -48,7 +48,7 @@ export interface RiskSettings { large_change: number; prod_level: "medium" | "hi
 export interface Run {
   id: string; stack_id: string; stack: string; bu: string; entity: string; environment: string; operation: string; status: string;
   created_by: string; config_hash: string; plan_sha256?: string;
-  plan_summary?: { add: number; change: number; destroy: number; replace: number; resources: ResourceChange[]; outputs?: string[] };
+  plan_summary?: { add: number; change: number; destroy: number; replace: number; imports?: number; resources: ResourceChange[]; outputs?: string[] };
   policy_result?: { passed: boolean; violations: Violation[] | null };
   risk?: Risk; cost?: CostEstimate; required_approvals: Step[]; approvals: Approval[];
   error?: string; created_at: string; updated_at: string; planned_at?: string; finished_at?: string;
