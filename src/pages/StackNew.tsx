@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Ctx } from "../App";
+import { inScope, type Ctx } from "../App";
 import { canChange, type CatalogInput, type CatalogModule, type StackSpec } from "../api";
 import { ErrorBox, Loading, go, useLoad } from "../ui";
 
@@ -33,7 +33,7 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
   const api = ctx.api;
   const catalog = useLoad(api.catalog, [ctx.t.slug]);
   const envs = useLoad(api.environments, [ctx.t.slug]);
-  const writable = (envs.data ?? []).filter(e => canChange(ctx.t, e.entity) && (!ctx.entity || e.entity === ctx.entity));
+  const writable = (envs.data ?? []).filter(e => canChange(ctx.t, e.bu) && inScope(ctx, e.bu, e.entity));
   const [name, setName] = useState("");
   const [env, setEnv] = useState("");
   const [instances, setInstances] = useState<Instance[]>([]);
@@ -100,7 +100,7 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
           <div><label htmlFor="se">Environment</label>
             <select id="se" value={env} onChange={e => { setEnv(e.target.value); setInstances([]); setPreview(null); }}>
               <option value="">Choose…</option>
-              {writable.map(e => <option key={e.id} value={e.name}>{e.entity} / {e.name} ({e.cloud.provider}, {e.tier})</option>)}
+              {writable.map(e => <option key={e.id} value={e.name}>{e.entity} / {e.bu} / {e.name} ({e.connection || "no cloud"}, {e.tier})</option>)}
             </select></div>
         </div>
       </div>

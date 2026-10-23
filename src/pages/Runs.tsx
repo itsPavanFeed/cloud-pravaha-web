@@ -1,10 +1,10 @@
-import type { Ctx } from "../App";
+import { inScope, type Ctx } from "../App";
 import type { Run } from "../api";
 import { Empty, ErrorBox, Link, Loading, RiskBadge, Status, Time, useLoad } from "../ui";
 
 export default function Runs({ ctx }: { ctx: Ctx }) {
   const { data, error } = useLoad(ctx.api.runs, [ctx.t.slug], 4000);
-  const rows = (data ?? []).filter(r => !ctx.entity || r.entity === ctx.entity);
+  const rows = (data ?? []).filter(r => inScope(ctx, r.bu, r.entity));
   const waiting = rows.filter(r => r.status === "planned");
   return (
     <>
@@ -24,7 +24,7 @@ export function RunTable({ ctx, runs, showStack = true }: { ctx: Ctx; runs: Run[
         <tbody>{runs.map(r => (
           <tr key={r.id}>
             <td><Link to={`${base}runs/${r.id}`} className="mono">{r.id.slice(0, 8)}</Link></td>
-            {showStack && <td>{r.stack} <span className="tag">{r.entity}</span></td>}
+            {showStack && <td>{r.stack} <span className="tag">{r.bu}</span></td>}
             <td>{r.operation}</td>
             <td><Status s={r.status} /></td>
             <td><RiskBadge level={r.risk?.level} /></td>

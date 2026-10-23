@@ -28,9 +28,9 @@ export default function StackDetail({ ctx, id }: { ctx: Ctx; id: string }) {
   return (
     <>
       <div className="head">
-        <div><div className="muted small">{stack.environment} · <span className="tag">{stack.entity}</span></div><h1>{stack.name}</h1>
+        <div><div className="muted small">{stack.environment} · {stack.entity} / <span className="tag">{stack.bu}</span></div><h1>{stack.name}</h1>
           <div className="muted small">Created by {stack.created_by} · updated <Time iso={stack.updated_at} /></div></div>
-        {canChange(ctx.t, stack.entity) && (
+        {canChange(ctx.t, stack.bu) && (
           <div className="row">
             <button onClick={() => start("apply")}>Plan changes</button>
             <button className="ghost" onClick={() => start("destroy")}>Plan destroy</button>
@@ -42,7 +42,7 @@ export default function StackDetail({ ctx, id }: { ctx: Ctx; id: string }) {
       <div className="panel">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <h2 style={{ margin: 0 }}>Spec</h2>
-          {canChange(ctx.t, stack.entity) && !editing && <button className="ghost small" onClick={() => { setText(JSON.stringify(stack.spec, null, 2)); setEditing(true); }}>Edit</button>}
+          {canChange(ctx.t, stack.bu) && !editing && <button className="ghost small" onClick={() => { setText(JSON.stringify(stack.spec, null, 2)); setEditing(true); }}>Edit</button>}
         </div>
         {editing ? (
           <>

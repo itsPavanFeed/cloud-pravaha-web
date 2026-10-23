@@ -2,7 +2,7 @@
 
 The Cloud Pravaha console: React + TypeScript, built with Vite. Its only runtime dependencies are `react` and `react-dom`, pinned exactly.
 
-The console talks only to the central plane. Infrastructure pages go through the wrapper (`/api/v1/t/{tenant}/…`) to the selected tenant's own backend. A tenant switcher and a business-unit filter in the sidebar scope every page.
+The console talks only to the central plane. Infrastructure pages go through the wrapper (`/api/v1/t/{tenant}/…`) to the selected tenant's own backend. A tenant switcher and an entity / business-unit filter in the sidebar scope every page.
 
 | Page | What you can do |
 | --- | --- |
@@ -11,9 +11,10 @@ The console talks only to the central plane. Infrastructure pages go through the
 | Stack | Plan changes or a destroy, edit the spec, see runs and encrypted state versions |
 | Run | Risk level and reasons, the approval chain (manager, FinOps, Security) with only the steps you may sign, live logs, plan, policy, discard |
 | Module catalog | Approved modules grouped by provider, versions, inputs and enforced baselines |
-| Environments | Each unit's cloud integrations and tier (prod raises risk); the tenant's OIDC issuer, audience and subject to trust |
+| Environments | Each BU's environments: cloud connection, tier (prod raises risk), runner pool and guardrails |
+| Cloud connections | The tenant's AWS accounts, GCP projects and Azure subscriptions, which entities may use them, and the OIDC issuer, audience and subject to trust |
 | Audit log | The tenant's hash-chained log, filtered to what your roles may see; chain verification for tenant-wide roles |
-| Tenant settings | (tenant admins) Backend health over mTLS, business units, people and roles, first tokens, runners |
+| Tenant settings | (tenant admins) Backend health over mTLS, the entity → BU tree, people and roles at tenant, entity or BU scope, first tokens, risk policy, runners |
 | Platform | (platform admins) Onboard tenants and check their backends |
 | My tokens | Create and revoke your own API tokens |
 

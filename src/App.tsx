@@ -12,20 +12,24 @@ import Audit from "./pages/Audit";
 import TenantAdmin from "./pages/TenantAdmin";
 import Platform from "./pages/Platform";
 import Account from "./pages/Account";
+import Connections from "./pages/Connections";
 
 // Everything a tenant page needs: who is signed in, which tenant, its API,
-// and the entity filter ("" = every entity the user can see).
+// and the scope filter: "" (everything visible), "entity:<slug>" or "bu:<slug>".
 export interface Ctx {
   me: Me;
   t: MeTenant;
   api: ReturnType<typeof tenantApi>;
-  entity: string;
+  scope: string;
 }
+
+export const inScope = (ctx: Ctx, bu: string, entity: string) =>
+  !ctx.scope || ctx.scope === `bu:${bu}` || ctx.scope === `entity:${entity}`;
 
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [checking, setChecking] = useState(!!session.get());
-  const [entity, setEntity] = useState("");
+  const [scope, setScope] = useState("");
   const route = useRoute();
 
   useEffect(() => {
@@ -47,7 +51,7 @@ export default function App() {
     return null;
   }
   const [page, id] = inTenant ? route.slice(2) : route;
-  const ctx: Ctx | null = t ? { me, t, api: tenantApi(t.slug), entity } : null;
+  const ctx: Ctx | null = t ? { me, t, api: tenantApi(t.slug), scope } : null;
   const base = t ? `t/${t.slug}/` : "";
 
   let body;
@@ -59,6 +63,7 @@ export default function App() {
     case "runs": body = id ? <RunDetail ctx={ctx} id={id} /> : <Runs ctx={ctx} />; break;
     case "catalog": body = <CatalogPage ctx={ctx} />; break;
     case "environments": body = <Environments ctx={ctx} />; break;
+    case "connections": body = <Connections ctx={ctx} />; break;
     case "audit": body = <Audit ctx={ctx} />; break;
     case "settings": body = <TenantAdmin ctx={ctx} />; break;
     default: body = <Stacks ctx={ctx} />;
@@ -66,7 +71,8 @@ export default function App() {
 
   const nav: [string, string, boolean][] = t ? [
     ["stacks", "Stacks", true], ["runs", "Runs", true], ["catalog", "Module catalog", true],
-    ["environments", "Environments", true], ["audit", "Audit log", true], ["settings", "Tenant settings", has(t, "tenant_admin")],
+    ["environments", "Environments", true], ["connections", "Cloud connections", true], ["audit", "Audit log", true],
+    ["settings", "Tenant settings", has(t, "tenant_admin")],
   ] : [];
 
   return (
@@ -76,16 +82,21 @@ export default function App() {
         {me.tenants.length > 0 && (
           <div className="switcher">
             <label htmlFor="tenant-pick">Tenant</label>
-            <select id="tenant-pick" value={slug} onChange={e => { setEntity(""); go(`t/${e.target.value}/stacks`); }}>
+            <select id="tenant-pick" value={slug} onChange={e => { setScope(""); go(`t/${e.target.value}/stacks`); }}>
               {!t && <option value="">Choose…</option>}
               {me.tenants.map(x => <option key={x.slug} value={x.slug}>{x.name}</option>)}
             </select>
             {t && (
               <>
-                <label htmlFor="entity-pick">Business unit</label>
-                <select id="entity-pick" value={entity} onChange={e => setEntity(e.target.value)}>
+                <label htmlFor="scope-pick">Entity / business unit</label>
+                <select id="scope-pick" value={scope} onChange={e => setScope(e.target.value)}>
                   <option value="">All I can see</option>
-                  {t.entities.map(e => <option key={e.slug} value={e.slug}>{e.name}</option>)}
+                  {t.entities.map(e => (
+                    <optgroup key={e.slug} label={e.name}>
+                      <option value={`entity:${e.slug}`}>All of {e.name}</option>
+                      {e.bus.map(b => <option key={b.slug} value={`bu:${b.slug}`}>{b.name}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </>
             )}
@@ -97,7 +108,9 @@ export default function App() {
         <Link to="account" className={route[0] === "account" ? "on" : ""}>My tokens</Link>
         <div className="who">
           <div><strong>{me.user.email}</strong></div>
-          {t && <div className="muted small">{[...(t.platform_admin ? ["platform admin"] : []), ...t.tenant_roles, ...t.entities.filter(e => e.roles.length).map(e => `${e.roles.join("/")} @ ${e.slug}`)].join(", ") || "no roles"}</div>}
+          {t && <div className="muted small">{[...(t.platform_admin ? ["platform admin"] : []), ...t.tenant_roles,
+            ...t.entities.filter(e => e.roles.length).map(e => `${e.roles.join("/")} @ ${e.slug}`),
+            ...t.entities.flatMap(e => e.bus.filter(b => b.roles.some(r => !e.roles.includes(r))).map(b => `${b.roles.filter(r => !e.roles.includes(r)).join("/")} @ ${b.slug}`))].join(", ") || "no roles"}</div>}
           <button className="ghost small" style={{ marginTop: 8 }} onClick={() => { session.clear(); setMe(null); }}>Sign out</button>
         </div>
       </nav>

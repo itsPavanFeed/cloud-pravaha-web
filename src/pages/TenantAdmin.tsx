@@ -4,24 +4,30 @@ import { central, type RiskSettings, type Step } from "../api";
 import { Copy, ErrorBox, Loading, Time, useLoad } from "../ui";
 
 const tenantRoles = ["tenant_admin", "finops", "security", "auditor"];
-const entityRoles = ["admin", "manager", "developer", "viewer"];
+const scopedRoles = ["admin", "manager", "developer", "viewer"];
 
 export default function TenantAdmin({ ctx }: { ctx: Ctx }) {
   const slug = ctx.t.slug;
   const health = useLoad(() => central.health(slug), [slug]);
   const entities = useLoad(() => central.entities(slug), [slug]);
+  const bus = useLoad(() => central.bus(slug), [slug]);
+  const [newBU, setNewBU] = useState({ slug: "", name: "", entity: "" });
   const members = useLoad(() => central.members(slug), [slug]);
   const runners = useLoad(ctx.api.runners, [slug], 10000);
   const riskCfg = useLoad(ctx.api.riskSettings, [slug]);
   const [rs, setRs] = useState<RiskSettings | null>(null);
   const cfg = rs ?? riskCfg.data;
   const [ent, setEnt] = useState({ slug: "", name: "" });
-  const [m, setM] = useState({ email: "", entity: "", role: "finops" });
+  const [m, setM] = useState({ email: "", scope: "", role: "finops" }); // scope: "" | entity:x | bu:y
   const [r, setR] = useState({ name: "", pool: "default" });
   const [secret, setSecret] = useState<{ label: string; value: string } | null>(null);
   const [error, setError] = useState<unknown>(null);
   const run = async (fn: () => Promise<unknown>) => { setError(null); try { await fn(); } catch (e) { setError(e); } };
-  const roles = m.entity ? entityRoles : tenantRoles;
+  const roles = m.scope ? scopedRoles : tenantRoles;
+  const grant = () => {
+    const [kind, value] = m.scope.split(":");
+    return central.addMember(slug, { email: m.email, role: m.role, ...(kind === "entity" ? { entity: value } : kind === "bu" ? { bu: value } : {}) });
+  };
 
   return (
     <>
@@ -37,33 +43,57 @@ export default function TenantAdmin({ ctx }: { ctx: Ctx }) {
       <ErrorBox error={error} />
 
       <div className="panel">
-        <h2>Business units</h2>
-        {!entities.data ? <Loading /> : <div className="row" style={{ marginBottom: 12 }}>{entities.data.map(e => <span key={e.id} className="tag">{e.name} ({e.slug})</span>)}</div>}
+        <h2>Entities and business units</h2>
+        <p className="muted small">An entity is a company in the tenant; each has business units (products). Roles granted on an entity apply to all its business units.</p>
+        {!entities.data || !bus.data ? <Loading /> : (
+          <div className="grid" style={{ marginBottom: 14 }}>
+            {entities.data.map(e => (
+              <div className="card" key={e.id}>
+                <h3>{e.name} <span className="tag">{e.slug}</span></h3>
+                {bus.data!.filter(b => b.entity === e.slug).map(b => <div key={b.id} className="small">↳ {b.name} <span className="tag">{b.slug}</span></div>)}
+                {bus.data!.every(b => b.entity !== e.slug) && <div className="muted small">No business units yet.</div>}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="row" style={{ marginBottom: 8 }}>
+          <input style={{ maxWidth: 170 }} placeholder="entity slug, e.g. retail" value={ent.slug} onChange={e => setEnt({ ...ent, slug: e.target.value })} />
+          <input style={{ maxWidth: 220 }} placeholder="Entity name" value={ent.name} onChange={e => setEnt({ ...ent, name: e.target.value })} />
+          <button disabled={!ent.slug || !ent.name} onClick={() => run(async () => { await central.createEntity(slug, ent.slug, ent.name); setEnt({ slug: "", name: "" }); entities.reload(); })}>Add entity</button>
+        </div>
         <div className="row">
-          <input style={{ maxWidth: 180 }} placeholder="slug, e.g. payments" value={ent.slug} onChange={e => setEnt({ ...ent, slug: e.target.value })} />
-          <input style={{ maxWidth: 240 }} placeholder="Name" value={ent.name} onChange={e => setEnt({ ...ent, name: e.target.value })} />
-          <button disabled={!ent.slug || !ent.name} onClick={() => run(async () => { await central.createEntity(slug, ent.slug, ent.name); setEnt({ slug: "", name: "" }); entities.reload(); })}>Add business unit</button>
+          <select style={{ maxWidth: 200 }} value={newBU.entity} onChange={e => setNewBU({ ...newBU, entity: e.target.value })}>
+            <option value="">Entity…</option>{(entities.data ?? []).map(e => <option key={e.slug} value={e.slug}>{e.name}</option>)}</select>
+          <input style={{ maxWidth: 170 }} placeholder="BU slug, e.g. payments" value={newBU.slug} onChange={e => setNewBU({ ...newBU, slug: e.target.value })} />
+          <input style={{ maxWidth: 220 }} placeholder="BU name" value={newBU.name} onChange={e => setNewBU({ ...newBU, name: e.target.value })} />
+          <button disabled={!newBU.slug || !newBU.name || !newBU.entity} onClick={() => run(async () => { await central.createBU(slug, newBU.slug, newBU.name, newBU.entity); setNewBU({ slug: "", name: "", entity: newBU.entity }); bus.reload(); })}>Add business unit</button>
         </div>
       </div>
 
       <div className="panel">
         <h2>People and roles</h2>
-        <p className="muted small">Tenant-wide roles: tenant_admin, finops and security approve across every unit, auditor reads everything. Unit roles: admin, manager (approves the manager step), developer (authors stacks and starts runs), viewer.</p>
+        <p className="muted small">Tenant-wide roles: tenant_admin, finops and security approve across every business unit, auditor reads everything. Entity or BU roles: admin, manager (signs the manager step), developer (authors stacks and starts runs), viewer. Entity roles apply to all of its business units.</p>
         <div className="grid">
           <div><label>Email</label><input value={m.email} onChange={e => setM({ ...m, email: e.target.value })} placeholder="alice@example.com" /></div>
-          <div><label>Scope</label><select value={m.entity} onChange={e => setM({ ...m, entity: e.target.value, role: e.target.value ? "developer" : "finops" })}>
-            <option value="">Whole tenant</option>{(entities.data ?? []).map(e => <option key={e.slug} value={e.slug}>{e.name}</option>)}</select></div>
+          <div><label>Scope</label><select value={m.scope} onChange={e => setM({ ...m, scope: e.target.value, role: e.target.value ? "developer" : "finops" })}>
+            <option value="">Whole tenant</option>
+            {(entities.data ?? []).map(e => (
+              <optgroup key={e.slug} label={e.name}>
+                <option value={`entity:${e.slug}`}>{e.name} (all its BUs)</option>
+                {(bus.data ?? []).filter(b => b.entity === e.slug).map(b => <option key={b.slug} value={`bu:${b.slug}`}>{b.name}</option>)}
+              </optgroup>))}
+          </select></div>
           <div><label>Role</label><select value={m.role} onChange={e => setM({ ...m, role: e.target.value })}>{roles.map(x => <option key={x}>{x}</option>)}</select></div>
         </div>
         <div className="row" style={{ margin: "12px 0 16px" }}>
-          <button disabled={!m.email} onClick={() => run(async () => { await central.addMember(slug, m); members.reload(); })}>Grant role</button>
+          <button disabled={!m.email} onClick={() => run(async () => { await grant(); members.reload(); })}>Grant role</button>
         </div>
         {members.data && (
           <table>
             <thead><tr><th>Person</th><th>Scope</th><th>Role</th><th>Granted by</th><th /></tr></thead>
             <tbody>{members.data.map(x => (
               <tr key={x.id}>
-                <td>{x.email}</td><td>{x.entity ? <span className="tag">{x.entity}</span> : <span className="muted">tenant</span>}</td><td>{x.role}</td>
+                <td>{x.email}</td><td>{x.bu ? <><span className="muted small">BU</span> <span className="tag">{x.bu}</span></> : x.entity ? <><span className="muted small">entity</span> <span className="tag">{x.entity}</span></> : <span className="muted">tenant</span>}</td><td>{x.role}</td>
                 <td className="small muted">{x.created_by} · <Time iso={x.created_at} /></td>
                 <td className="row">
                   <button className="ghost small" onClick={() => run(async () => { const t = await central.memberToken(slug, x.email, "issued by admin", 30); setSecret({ label: `Token for ${t.user}`, value: t.secret }); })}>Issue token</button>

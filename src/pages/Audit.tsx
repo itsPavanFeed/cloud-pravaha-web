@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Ctx } from "../App";
+import { inScope, type Ctx } from "../App";
 import { has } from "../api";
 import { ErrorBox, Loading, Time, useLoad } from "../ui";
 
@@ -27,10 +27,10 @@ export default function Audit({ ctx }: { ctx: Ctx }) {
         <div className="panel" style={{ padding: 0 }}>
           <table>
             <thead><tr><th>#</th><th>When</th><th>Actor</th><th>Action</th><th>Target</th><th>Unit</th><th>Details</th></tr></thead>
-            <tbody>{data.filter(e => !ctx.entity || e.entity === ctx.entity).map(e => (
+            <tbody>{data.filter(e => !ctx.scope || (e.scope && inScope(ctx, e.scope, ctx.t.entities.find(x => x.bus.some(b => b.slug === e.scope))?.slug ?? ""))).map(e => (
               <tr key={e.id}>
                 <td className="muted">{e.id}</td><td><Time iso={e.ts} /></td><td>{e.actor}</td>
-                <td><span className="tag">{e.action}</span></td><td className="mono small">{e.target}</td><td>{e.entity ? <span className="tag">{e.entity}</span> : <span className="muted small">tenant</span>}</td>
+                <td><span className="tag">{e.action}</span></td><td className="mono small">{e.target}</td><td>{e.scope ? <span className="tag">{e.scope}</span> : <span className="muted small">tenant</span>}</td>
                 <td><details><summary className="small muted">payload</summary><pre className="code small">{JSON.stringify(e.payload, null, 2)}</pre><div className="mono small muted">hash {e.hash.slice(0, 24)}…</div></details></td>
               </tr>))}
             </tbody>

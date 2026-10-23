@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { Ctx } from "../App";
-import { canApprove, canChange, entityRoles, type LogChunk, type Step } from "../api";
+import { buRoles, canApprove, canChange, type LogChunk, type Step } from "../api";
 import { ErrorBox, Link, Loading, RiskBadge, Status, Time, useLoad } from "../ui";
 
 const active = ["queued", "planning", "apply_queued", "applying"];
 const stepLabel: Record<Step, string> = { manager: "Manager", finops: "FinOps", security: "Security" };
 const stepWho: Record<Step, string> = {
-  manager: "a manager of the business unit", finops: "the tenant's FinOps role", security: "the tenant's Security role",
+  manager: "a manager of the business unit (or its entity)", finops: "the tenant's FinOps role", security: "the tenant's Security role",
 };
 
 export default function RunDetail({ ctx, id }: { ctx: Ctx; id: string }) {
@@ -47,14 +47,14 @@ export default function RunDetail({ ctx, id }: { ctx: Ctx; id: string }) {
   const mine = run.approvals.find(a => a.approver === me);
   const own = run.created_by === me;
   const signable = run.status === "planned" && !own && !mine
-    ? run.required_approvals.filter(st => !signed.has(st) && canApprove(ctx.t, st, run.entity)) : [];
+    ? run.required_approvals.filter(st => !signed.has(st) && canApprove(ctx.t, st, run.bu)) : [];
   const base = `t/${ctx.t.slug}/`;
 
   return (
     <>
       <div className="head">
         <div>
-          <div className="muted small"><Link to={`${base}stacks/${run.stack_id}`}>{run.stack}</Link> · {run.environment} · <span className="tag">{run.entity}</span></div>
+          <div className="muted small"><Link to={`${base}stacks/${run.stack_id}`}>{run.stack}</Link> · {run.environment} · {run.entity} / <span className="tag">{run.bu}</span></div>
           <h1>{run.operation === "destroy" ? "Destroy" : "Apply"} run <span className="mono">{run.id.slice(0, 8)}</span></h1>
         </div>
         <div className="row"><RiskBadge level={run.risk?.level} /><Status s={run.status} /></div>
@@ -94,7 +94,7 @@ export default function RunDetail({ ctx, id }: { ctx: Ctx; id: string }) {
                 {signable.map(st => (
                   <button key={st} disabled={busy} onClick={() => act(() => ctx.api.approve(run.id, st, reason))}>Approve as {stepLabel[st]}</button>
                 ))}
-                {(canChange(ctx.t, run.entity) || entityRoles(ctx.t, run.entity).includes("manager")) &&
+                {(canChange(ctx.t, run.bu) || buRoles(ctx.t, run.bu).includes("manager")) &&
                   <button className="ghost" disabled={busy} onClick={() => act(() => ctx.api.discard(run.id, reason || "discarded from UI"))}>Discard</button>}
               </div>
               {signable.length === 0 && !own && !mine && <p className="muted small">None of the remaining steps match your roles.</p>}
@@ -102,7 +102,7 @@ export default function RunDetail({ ctx, id }: { ctx: Ctx; id: string }) {
           )}
         </div>
       )}
-      {run.status === "queued" && canChange(ctx.t, run.entity) && (
+      {run.status === "queued" && canChange(ctx.t, run.bu) && (
         <div className="row" style={{ marginBottom: 18 }}><button className="ghost" disabled={busy} onClick={() => act(() => ctx.api.discard(run.id, "cancelled before planning"))}>Cancel run</button></div>
       )}
       {run.error && <div className="error"><strong>{run.status === "discarded" ? "Discarded" : "Error"}:</strong> {run.error}</div>}
