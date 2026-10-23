@@ -65,6 +65,7 @@ export interface Runner { id: string; name: string; pool: string; created_at: st
 export interface StateVersion { serial: number; sha256: string; size: number; run_id?: string; created_at: string }
 export interface Tenant { id: string; slug: string; name: string; backend_url: string; created_by: string; created_at: string }
 export interface Entity { id: string; slug: string; name: string; created_by: string; created_at: string }
+export interface PolicySet { id: string; name: string; scope: string; level: "hard" | "advisory"; module: string; enabled: boolean; created_by: string; updated_by: string; updated_at: string }
 export interface BU { id: string; slug: string; name: string; entity: string; created_by: string; created_at: string }
 export interface Membership { id: string; email: string; tenant: string; entity?: string; bu?: string; role: string; created_by: string; created_at: string }
 
@@ -147,6 +148,10 @@ export const tenant = (t: string) => {
     putContracts: (c: ContractsConfig) => call<ContractsConfig>("PUT", p("/contracts"), c),
     putContractsToken: (token: string) => call<void>("PUT", p("/contracts/token"), { token }),
     syncContracts: () => call<ContractsState["status"]>("POST", p("/contracts/sync")),
+    policies: () => call<PolicySet[]>("GET", p("/policies")),
+    createPolicy: (b: { name: string; scope: string; level: string; module: string; enabled: boolean }) => call<PolicySet>("POST", p("/policies"), b),
+    updatePolicy: (id: string, b: { scope: string; level: string; module: string; enabled: boolean }) => call<PolicySet>("PUT", p(`/policies/${id}`), b),
+    testPolicy: (module: string, run_id: string) => call<Violation[] | null>("POST", p("/policies/test"), { module, run_id }),
     riskSettings: () => call<RiskSettings>("GET", p("/settings/risk")),
     putRiskSettings: (r: RiskSettings) => call<RiskSettings>("PUT", p("/settings/risk"), r),
     runners: () => call<Runner[]>("GET", p("/runners")),
