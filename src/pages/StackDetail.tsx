@@ -14,7 +14,8 @@ export default function StackDetail({ ctx, id }: { ctx: Ctx; id: string }) {
   const [actionError, setActionError] = useState<unknown>(null);
 
   if (!stack) return error ? <ErrorBox error={error} /> : <Loading />;
-  const start = async (op: "apply" | "destroy") => {
+  const [drift, setDrift] = useState<{ interval_minutes: number; auto_remediate: boolean } | null>(null);
+  const start = async (op: "apply" | "destroy" | "drift") => {
     setActionError(null);
     try { const r = await api.createRun(stack.id, op); go(`t/${ctx.t.slug}/runs/${r.id}`); } catch (e) { setActionError(e); }
   };
@@ -33,6 +34,7 @@ export default function StackDetail({ ctx, id }: { ctx: Ctx; id: string }) {
         {canChange(ctx.t, stack.bu) && (
           <div className="row">
             <button onClick={() => start("apply")}>Plan changes</button>
+            <button className="ghost" onClick={() => start("drift")}>Check drift</button>
             <button className="ghost" onClick={() => start("destroy")}>Plan destroy</button>
           </div>
         )}
@@ -60,6 +62,23 @@ export default function StackDetail({ ctx, id }: { ctx: Ctx; id: string }) {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="panel">
+        <h2>Drift detection</h2>
+        <p className="muted small">A drift check is a refresh-only plan: it compares the real infrastructure with state, changes nothing and needs no approvals. Auto-remediation queues a normal plan, which still needs the risk-based approvals.</p>
+        {(() => {
+          const d = drift ?? stack.drift;
+          return (
+            <div className="row">
+              <label className="row small" style={{ margin: 0, fontWeight: 400 }}>Check every
+                <input type="number" min={0} style={{ width: 90 }} value={d.interval_minutes} disabled={!canChange(ctx.t, stack.bu)} onChange={e => setDrift({ ...d, interval_minutes: Number(e.target.value) })} /> minutes (0 = off)</label>
+              <label className="row small" style={{ margin: 0, fontWeight: 400 }}><input type="checkbox" checked={d.auto_remediate} disabled={!canChange(ctx.t, stack.bu)} onChange={e => setDrift({ ...d, auto_remediate: e.target.checked })} /> auto-remediate</label>
+              {drift && <button className="small" onClick={async () => { setActionError(null); try { await api.setDrift(stack.id, drift); setDrift(null); reload(); } catch (e) { setActionError(e); } }}>Save</button>}
+              <span className="muted small">{stack.drift.last_check ? `last scheduled check ${new Date(stack.drift.last_check).toLocaleString()}` : "no scheduled checks yet"}</span>
+            </div>
+          );
+        })()}
       </div>
 
       <h2>Runs</h2>

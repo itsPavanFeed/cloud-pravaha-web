@@ -37,6 +37,7 @@ export interface RunBrief { id: string; status: string; operation: string; creat
 export interface Stack {
   id: string; name: string; bu: string; entity: string; environment: string; environment_id: string; spec: StackSpec;
   created_by: string; created_at: string; updated_at: string; last_run?: RunBrief;
+  drift: { interval_minutes: number; auto_remediate: boolean; last_check?: string };
 }
 
 export interface ResourceChange { address: string; type: string; actions: string[]; importing?: boolean; after?: Record<string, unknown> }
@@ -48,7 +49,7 @@ export interface RiskSettings { large_change: number; prod_level: "medium" | "hi
 export interface Run {
   id: string; stack_id: string; stack: string; bu: string; entity: string; environment: string; operation: string; status: string;
   created_by: string; config_hash: string; plan_sha256?: string;
-  plan_summary?: { add: number; change: number; destroy: number; replace: number; imports?: number; resources: ResourceChange[]; outputs?: string[] };
+  plan_summary?: { add: number; change: number; destroy: number; replace: number; imports?: number; resources: ResourceChange[]; outputs?: string[]; drift?: ResourceChange[] };
   policy_result?: { passed: boolean; violations: Violation[] | null };
   risk?: Risk; cost?: CostEstimate; required_approvals: Step[]; approvals: Approval[];
   error?: string; created_at: string; updated_at: string; planned_at?: string; finished_at?: string;
@@ -129,7 +130,8 @@ export const tenant = (t: string) => {
       call<{ valid: boolean; problems?: string[]; files?: Record<string, string>; providers?: string[]; hash?: string }>("POST", p("/stacks/preview"), s),
     stackRuns: (id: string) => call<Run[]>("GET", p(`/stacks/${id}/runs`)),
     stateVersions: (id: string) => call<StateVersion[]>("GET", p(`/stacks/${id}/state-versions`)),
-    createRun: (stackId: string, operation: "apply" | "destroy") => call<Run>("POST", p(`/stacks/${stackId}/runs`), { operation }),
+    setDrift: (stackId: string, d: { interval_minutes: number; auto_remediate: boolean }) => call<Stack>("PUT", p(`/stacks/${stackId}/drift`), d),
+    createRun: (stackId: string, operation: "apply" | "destroy" | "drift") => call<Run>("POST", p(`/stacks/${stackId}/runs`), { operation }),
     runs: () => call<Run[]>("GET", p("/runs")),
     run: (id: string) => call<Run>("GET", p(`/runs/${id}`)),
     logs: (id: string, after: number) => call<LogChunk[]>("GET", p(`/runs/${id}/logs?after=${after}`)),

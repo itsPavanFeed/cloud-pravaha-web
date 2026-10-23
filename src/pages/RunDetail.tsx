@@ -55,7 +55,7 @@ export default function RunDetail({ ctx, id }: { ctx: Ctx; id: string }) {
       <div className="head">
         <div>
           <div className="muted small"><Link to={`${base}stacks/${run.stack_id}`}>{run.stack}</Link> · {run.environment} · {run.entity} / <span className="tag">{run.bu}</span></div>
-          <h1>{run.operation === "destroy" ? "Destroy" : "Apply"} run <span className="mono">{run.id.slice(0, 8)}</span></h1>
+          <h1>{run.operation === "destroy" ? "Destroy" : run.operation === "drift" ? "Drift check" : "Apply"} run <span className="mono">{run.id.slice(0, 8)}</span></h1>
         </div>
         <div className="row"><RiskBadge level={run.risk?.level} /><Status s={run.status} /></div>
       </div>
@@ -149,6 +149,13 @@ export default function RunDetail({ ctx, id }: { ctx: Ctx; id: string }) {
         </div>
       </div>
 
+      {s?.drift && s.drift.length > 0 && (
+        <div className="panel">
+          <h2>Drift found</h2>
+          <p className="muted small">These resources were changed outside OpenTofu since the last apply.</p>
+          <table><tbody>{s.drift.map(d => <tr key={d.address}><td className="mono small">{d.address}</td><td className="mono small">{d.type}</td><td className="chg">{d.actions.join(" → ")}</td></tr>)}</tbody></table>
+        </div>
+      )}
       {s && s.resources.length > 0 && (
         <div className="panel" style={{ padding: 0 }}>
           <table>

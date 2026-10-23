@@ -47,7 +47,7 @@ export const Loading = () => <p className="muted">Loading…</p>;
 
 const tone: Record<string, string> = {
   applied: "ok", no_changes: "ok", planned: "wait", apply_queued: "wait", queued: "idle", planning: "busy",
-  applying: "busy", policy_failed: "bad", failed: "bad", discarded: "idle",
+  applying: "busy", policy_failed: "bad", failed: "bad", discarded: "idle", no_drift: "ok", drifted: "wait",
 };
 export const statusLabel = (s: string) => s.replace(/_/g, " ");
 export const Status = ({ s }: { s: string }) => <span className={`badge ${tone[s] ?? "idle"}`}>{statusLabel(s)}</span>;
