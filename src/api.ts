@@ -38,7 +38,11 @@ export interface Stack {
   id: string; name: string; bu: string; entity: string; environment: string; environment_id: string; spec: StackSpec;
   created_by: string; created_at: string; updated_at: string; last_run?: RunBrief;
   drift: { interval_minutes: number; auto_remediate: boolean; last_check?: string };
+  managed_by: "ui" | "git"; source_ref?: string;
 }
+export interface ContractsConfig { provider: "github" | "gitlab" | "local"; repo: string; branch: string; path: string; api_url?: string; poll_seconds: number; auto_plan: boolean; auto_apply_low_risk: boolean; enabled: boolean }
+export interface SyncResult { file?: string; stack?: string; action: string; run_id?: string; error?: string }
+export interface ContractsState { config: ContractsConfig | null; token_set: boolean; status: { revision: string; synced_at: string; error?: string; results: SyncResult[] | null } }
 
 export interface ResourceChange { address: string; type: string; actions: string[]; importing?: boolean; after?: Record<string, unknown> }
 export interface Violation { rule: string; level: "hard" | "advisory"; address?: string; message: string }
@@ -139,6 +143,10 @@ export const tenant = (t: string) => {
     discard: (id: string, reason: string) => call<Run>("POST", p(`/runs/${id}/discard`), { reason }),
     audit: (q: string) => call<AuditEvent[]>("GET", p(`/audit?limit=200&q=${encodeURIComponent(q)}`)),
     verifyAudit: () => call<{ intact: boolean; checked: number; first_broken_id: number }>("GET", p("/audit/verify")),
+    contracts: () => call<ContractsState>("GET", p("/contracts")),
+    putContracts: (c: ContractsConfig) => call<ContractsConfig>("PUT", p("/contracts"), c),
+    putContractsToken: (token: string) => call<void>("PUT", p("/contracts/token"), { token }),
+    syncContracts: () => call<ContractsState["status"]>("POST", p("/contracts/sync")),
     riskSettings: () => call<RiskSettings>("GET", p("/settings/risk")),
     putRiskSettings: (r: RiskSettings) => call<RiskSettings>("PUT", p("/settings/risk"), r),
     runners: () => call<Runner[]>("GET", p("/runners")),

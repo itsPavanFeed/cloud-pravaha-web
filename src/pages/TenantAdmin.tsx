@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Ctx } from "../App";
-import { central, type RiskSettings, type Step } from "../api";
+import { central, type ContractsConfig, type RiskSettings, type Step } from "../api";
 import { Copy, ErrorBox, Loading, Time, useLoad } from "../ui";
 
 const tenantRoles = ["tenant_admin", "finops", "security", "auditor"];
@@ -15,6 +15,10 @@ export default function TenantAdmin({ ctx }: { ctx: Ctx }) {
   const members = useLoad(() => central.members(slug), [slug]);
   const runners = useLoad(ctx.api.runners, [slug], 10000);
   const riskCfg = useLoad(ctx.api.riskSettings, [slug]);
+  const contracts = useLoad(ctx.api.contracts, [slug], 15000);
+  const [cc, setCc] = useState<ContractsConfig | null>(null);
+  const [gitToken, setGitToken] = useState("");
+  const ccv: ContractsConfig = cc ?? contracts.data?.config ?? { provider: "github", repo: "", branch: "main", path: "stacks", poll_seconds: 60, auto_plan: true, auto_apply_low_risk: false, enabled: false };
   const [rs, setRs] = useState<RiskSettings | null>(null);
   const cfg = rs ?? riskCfg.data;
   const [ent, setEnt] = useState({ slug: "", name: "" });
@@ -102,6 +106,41 @@ export default function TenantAdmin({ ctx }: { ctx: Ctx }) {
               </tr>))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      <div className="panel">
+        <h2>Contracts repository</h2>
+        <p className="muted small">Stacks defined as JSON contracts in a Git branch (one file per stack: name, environment, spec). This backend polls the branch, outbound only, creates or updates Git-managed stacks and queues plans. Approvals still apply; low-risk changes can be applied automatically if you opt in.</p>
+        <div className="grid">
+          <div><label>Provider</label><select value={ccv.provider} onChange={e => setCc({ ...ccv, provider: e.target.value as ContractsConfig["provider"] })}><option value="github">GitHub</option><option value="gitlab">GitLab</option></select></div>
+          <div><label>Repository</label><input value={ccv.repo} placeholder="acme/infra-contracts" onChange={e => setCc({ ...ccv, repo: e.target.value })} /></div>
+          <div><label>Branch</label><input value={ccv.branch} onChange={e => setCc({ ...ccv, branch: e.target.value })} /></div>
+          <div><label>Folder</label><input value={ccv.path} onChange={e => setCc({ ...ccv, path: e.target.value })} /></div>
+          <div><label>API URL <span className="muted">(GitHub Enterprise / self-hosted GitLab)</span></label><input value={ccv.api_url ?? ""} onChange={e => setCc({ ...ccv, api_url: e.target.value || undefined })} /></div>
+          <div><label>Poll every (seconds)</label><input type="number" min={30} value={ccv.poll_seconds} onChange={e => setCc({ ...ccv, poll_seconds: Number(e.target.value) })} /></div>
+        </div>
+        <div className="row" style={{ margin: "10px 0" }}>
+          <label className="row small" style={{ margin: 0, fontWeight: 400 }}><input type="checkbox" checked={ccv.enabled} onChange={e => setCc({ ...ccv, enabled: e.target.checked })} /> polling enabled</label>
+          <label className="row small" style={{ margin: 0, fontWeight: 400 }}><input type="checkbox" checked={ccv.auto_plan} onChange={e => setCc({ ...ccv, auto_plan: e.target.checked })} /> plan changed contracts automatically</label>
+          <label className="row small" style={{ margin: 0, fontWeight: 400 }}><input type="checkbox" checked={ccv.auto_apply_low_risk} onChange={e => setCc({ ...ccv, auto_apply_low_risk: e.target.checked })} /> auto-apply low-risk plans</label>
+        </div>
+        <div className="row">
+          <button disabled={!cc} onClick={() => run(async () => { await ctx.api.putContracts(ccv); setCc(null); contracts.reload(); })}>Save repository</button>
+          <input type="password" style={{ maxWidth: 260 }} placeholder={contracts.data?.token_set ? "token set — enter to replace" : "access token (read-only)"} value={gitToken} onChange={e => setGitToken(e.target.value)} />
+          <button className="ghost" disabled={!gitToken} onClick={() => run(async () => { await ctx.api.putContractsToken(gitToken); setGitToken(""); contracts.reload(); })}>Save token</button>
+          <button className="ghost" disabled={!contracts.data?.config} onClick={() => run(async () => { await ctx.api.syncContracts(); contracts.reload(); })}>Sync now</button>
+        </div>
+        {contracts.data?.status?.revision && (
+          <>
+            <p className="small" style={{ marginTop: 12 }}>Last sync <span className="mono">{contracts.data.status.revision.slice(0, 7)}</span> at {new Date(contracts.data.status.synced_at).toLocaleString()}
+              {contracts.data.status.error && <span className="del"> — {contracts.data.status.error}</span>}</p>
+            <table><tbody>{(contracts.data.status.results ?? []).map((r, i) => (
+              <tr key={i}><td className="mono small">{r.stack ?? r.file}</td>
+                <td><span className={`badge ${r.action === "error" ? "bad" : r.action === "orphaned" || r.action === "waiting" ? "wait" : r.action === "unchanged" ? "idle" : "ok"}`}>{r.action}</span></td>
+                <td className="small">{r.run_id ? <a href={`#/t/${slug}/runs/${r.run_id}`}>run {r.run_id.slice(0, 8)}</a> : r.error}</td></tr>))}
+            </tbody></table>
+          </>
         )}
       </div>
 

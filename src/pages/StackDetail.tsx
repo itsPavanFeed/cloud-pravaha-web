@@ -44,7 +44,9 @@ export default function StackDetail({ ctx, id }: { ctx: Ctx; id: string }) {
       <div className="panel">
         <div className="row" style={{ justifyContent: "space-between" }}>
           <h2 style={{ margin: 0 }}>Spec</h2>
-          {canChange(ctx.t, stack.bu) && !editing && <button className="ghost small" onClick={() => { setText(JSON.stringify(stack.spec, null, 2)); setEditing(true); }}>Edit</button>}
+          {stack.managed_by === "git"
+            ? <span className="badge idle">managed by Git @ {stack.source_ref?.slice(0, 7)} — edit it in the contracts repository</span>
+            : canChange(ctx.t, stack.bu) && !editing && <button className="ghost small" onClick={() => { setText(JSON.stringify(stack.spec, null, 2)); setEditing(true); }}>Edit</button>}
         </div>
         {editing ? (
           <>
