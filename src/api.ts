@@ -96,6 +96,13 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 // Central plane: identity and directory.
 export const central = {
+  authConfig: () => fetch("/api/v1/auth/config").then(r => r.json() as Promise<{ sso: boolean; label: string }>),
+  exchange: async (code: string) => {
+    const r = await fetch("/api/v1/auth/exchange", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+    if (!r.ok) throw new ApiError(r.status, "This sign-in link has expired. Sign in again.");
+    return (await r.json()) as { secret: string };
+  },
+  logout: () => call<void>("POST", "/api/v1/auth/logout"),
   me: () => call<Me>("GET", "/api/v1/me"),
   myTokens: () => call<Token[]>("GET", "/api/v1/me/tokens"),
   createMyToken: (name: string, ttl_days: number) => call<{ token: Token; secret: string }>("POST", "/api/v1/me/tokens", { name, ttl_days }),

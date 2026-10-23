@@ -29,13 +29,20 @@ export const inScope = (ctx: Ctx, bu: string, entity: string) =>
 
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
-  const [checking, setChecking] = useState(!!session.get());
+  const [checking, setChecking] = useState(true);
   const [scope, setScope] = useState("");
   const route = useRoute();
 
   useEffect(() => {
-    if (!session.get()) return;
-    central.me().then(setMe, () => session.clear()).finally(() => setChecking(false));
+    // Returning from SSO: swap the one-time code for a session token.
+    const sso = window.location.hash.match(/^#\/sso\/([A-Za-z0-9_-]+)$/);
+    const start = sso
+      ? central.exchange(sso[1]).then(r => { session.set(r.secret); window.location.hash = "/"; })
+      : Promise.resolve();
+    setChecking(true);
+    start.then(() => (session.get() ? central.me().then(setMe, () => session.clear()) : undefined))
+      .catch(() => window.location.hash = "/login?sso_error=expired")
+      .finally(() => setChecking(false));
   }, []);
 
   if (checking) return null;
@@ -113,7 +120,7 @@ export default function App() {
           {t && <div className="muted small">{[...(t.platform_admin ? ["platform admin"] : []), ...t.tenant_roles,
             ...t.entities.filter(e => e.roles.length).map(e => `${e.roles.join("/")} @ ${e.slug}`),
             ...t.entities.flatMap(e => e.bus.filter(b => b.roles.some(r => !e.roles.includes(r))).map(b => `${b.roles.filter(r => !e.roles.includes(r)).join("/")} @ ${b.slug}`))].join(", ") || "no roles"}</div>}
-          <button className="ghost small" style={{ marginTop: 8 }} onClick={() => { session.clear(); setMe(null); }}>Sign out</button>
+          <button className="ghost small" style={{ marginTop: 8 }} onClick={() => { central.logout().catch(() => {}).finally(() => { session.clear(); setMe(null); }); }}>Sign out</button>
         </div>
       </nav>
       <main>{body}</main>
@@ -121,9 +128,20 @@ export default function App() {
   );
 }
 
+const ssoErrors: Record<string, string> = {
+  no_access: "Your account has no access yet. Ask a tenant admin to add you.",
+  email_not_verified: "Your identity provider did not confirm your email address.",
+  domain_not_allowed: "Your email domain is not allowed to sign in here.",
+  state_mismatch: "The sign-in could not be verified. Please try again.",
+  expired: "The sign-in took too long. Please try again.",
+};
+
 function Login({ onLogin }: { onLogin: (m: Me) => void }) {
   const [token, setToken] = useState("");
-  const [error, setError] = useState<unknown>(null);
+  const [sso, setSso] = useState<{ sso: boolean; label: string } | null>(null);
+  const code = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("sso_error");
+  const [error, setError] = useState<unknown>(code ? new Error(ssoErrors[code] ?? "Sign-in failed (" + code + ").") : null);
+  useEffect(() => { central.authConfig().then(setSso, () => {}); }, []);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     session.set(token.trim());
@@ -132,7 +150,13 @@ function Login({ onLogin }: { onLogin: (m: Me) => void }) {
   return (
     <div className="login panel">
       <div className="brand"><img src="/favicon.svg" alt="" /> Cloud Pravaha</div>
-      <p className="muted">OpenTofu orchestration for every tenant and business unit, with pinned public modules only. Sign in with an API token from your tenant admin.</p>
+      <p className="muted">OpenTofu orchestration for every tenant and business unit, with pinned public modules only.</p>
+      {sso?.sso && (
+        <>
+          <a href="/auth/login"><button type="button" style={{ width: "100%" }}>{sso.label}</button></a>
+          <p className="muted small" style={{ textAlign: "center", margin: "12px 0" }}>or use an API token</p>
+        </>
+      )}
       <form onSubmit={submit}>
         <label htmlFor="tok">API token</label>
         <input id="tok" type="password" autoComplete="off" placeholder="pvh_u_…" value={token} onChange={e => setToken(e.target.value)} />
