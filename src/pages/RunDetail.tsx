@@ -129,6 +129,16 @@ export default function RunDetail({ ctx, id }: { ctx: Ctx; id: string }) {
           ))}
         </div>
         <div className="card">
+          <h3>Estimated cost</h3>
+          {!run.cost ? <p className="muted">After planning.</p> : (
+            <>
+              <div className="counts"><div><b className={run.cost.monthly_delta_usd > 0 ? "chg" : "add"}>{run.cost.monthly_delta_usd >= 0 ? "+" : "−"}${Math.abs(run.cost.monthly_delta_usd).toFixed(2)}</b>per month</div></div>
+              {run.cost.items.slice(0, 4).map(i => <div key={i.address} className="small mono muted">{i.address} {i.monthly_usd >= 0 ? "+" : "−"}${Math.abs(i.monthly_usd).toFixed(2)}</div>)}
+              <p className="muted small">{run.cost.unpriced_resources > 0 && `${run.cost.unpriced_resources} usage-based resource(s) not priced. `}Approximate list prices.</p>
+            </>
+          )}
+        </div>
+        <div className="card">
           <h3>Who and when</h3>
           <dl className="kv">
             <dt>Started by</dt><dd>{run.created_by} · <Time iso={run.created_at} /></dd>

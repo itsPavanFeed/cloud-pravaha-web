@@ -40,12 +40,14 @@ export interface ResourceChange { address: string; type: string; actions: string
 export interface Violation { rule: string; level: "hard" | "advisory"; address?: string; message: string }
 export interface Approval { step: Step; approver: string; reason: string; created_at: string }
 export interface Risk { level: "low" | "medium" | "high"; reasons: string[]; required_approvals: Step[] }
+export interface CostEstimate { monthly_delta_usd: number; items: { address: string; type: string; monthly_usd: number; basis: string }[]; unpriced_resources: number; note: string }
+export interface RiskSettings { large_change: number; prod_level: "medium" | "high"; cost_medium_usd: number; cost_high_usd: number; approvals: Record<"low" | "medium" | "high", Step[]> }
 export interface Run {
   id: string; stack_id: string; stack: string; entity: string; environment: string; operation: string; status: string;
   created_by: string; config_hash: string; plan_sha256?: string;
   plan_summary?: { add: number; change: number; destroy: number; replace: number; resources: ResourceChange[]; outputs?: string[] };
   policy_result?: { passed: boolean; violations: Violation[] | null };
-  risk?: Risk; required_approvals: Step[]; approvals: Approval[];
+  risk?: Risk; cost?: CostEstimate; required_approvals: Step[]; approvals: Approval[];
   error?: string; created_at: string; updated_at: string; planned_at?: string; finished_at?: string;
 }
 export interface LogChunk { seq: number; ts: string; chunk: string }
@@ -125,6 +127,8 @@ export const tenant = (t: string) => {
     discard: (id: string, reason: string) => call<Run>("POST", p(`/runs/${id}/discard`), { reason }),
     audit: (q: string) => call<AuditEvent[]>("GET", p(`/audit?limit=200&q=${encodeURIComponent(q)}`)),
     verifyAudit: () => call<{ intact: boolean; checked: number; first_broken_id: number }>("GET", p("/audit/verify")),
+    riskSettings: () => call<RiskSettings>("GET", p("/settings/risk")),
+    putRiskSettings: (r: RiskSettings) => call<RiskSettings>("PUT", p("/settings/risk"), r),
     runners: () => call<Runner[]>("GET", p("/runners")),
     createRunner: (r: { name: string; pool: string }) => call<{ runner: Runner; secret: string }>("POST", p("/runners"), r),
     revokeRunner: (id: string) => call<void>("DELETE", p(`/runners/${id}`)),

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Ctx } from "../App";
-import { central } from "../api";
+import { central, type RiskSettings, type Step } from "../api";
 import { Copy, ErrorBox, Loading, Time, useLoad } from "../ui";
 
 const tenantRoles = ["tenant_admin", "finops", "security", "auditor"];
@@ -12,6 +12,9 @@ export default function TenantAdmin({ ctx }: { ctx: Ctx }) {
   const entities = useLoad(() => central.entities(slug), [slug]);
   const members = useLoad(() => central.members(slug), [slug]);
   const runners = useLoad(ctx.api.runners, [slug], 10000);
+  const riskCfg = useLoad(ctx.api.riskSettings, [slug]);
+  const [rs, setRs] = useState<RiskSettings | null>(null);
+  const cfg = rs ?? riskCfg.data;
   const [ent, setEnt] = useState({ slug: "", name: "" });
   const [m, setM] = useState({ email: "", entity: "", role: "finops" });
   const [r, setR] = useState({ name: "", pool: "default" });
@@ -71,6 +74,34 @@ export default function TenantAdmin({ ctx }: { ctx: Ctx }) {
           </table>
         )}
       </div>
+
+      {cfg && (
+        <div className="panel">
+          <h2>Risk policy</h2>
+          <p className="muted small">How plans are classified and which approvals each level needs. High risk always needs Security, and a higher level never needs fewer approvals.</p>
+          <div className="grid">
+            <div><label>Large change (resources)</label><input type="number" min={1} value={cfg.large_change} onChange={e => setRs({ ...cfg, large_change: Number(e.target.value) })} /></div>
+            <div><label>Production is at least</label><select value={cfg.prod_level} onChange={e => setRs({ ...cfg, prod_level: e.target.value as "medium" | "high" })}><option value="medium">medium</option><option value="high">high</option></select></div>
+            <div><label>Cost → medium ($/month, 0 = off)</label><input type="number" min={0} value={cfg.cost_medium_usd} onChange={e => setRs({ ...cfg, cost_medium_usd: Number(e.target.value) })} /></div>
+            <div><label>Cost → high ($/month, 0 = off)</label><input type="number" min={0} value={cfg.cost_high_usd} onChange={e => setRs({ ...cfg, cost_high_usd: Number(e.target.value) })} /></div>
+          </div>
+          <table style={{ marginTop: 12 }}>
+            <thead><tr><th>Risk</th>{(["manager", "finops", "security"] as Step[]).map(st => <th key={st}>{st}</th>)}</tr></thead>
+            <tbody>{(["low", "medium", "high"] as const).map(level => (
+              <tr key={level}><td><strong>{level}</strong></td>{(["manager", "finops", "security"] as Step[]).map(st => (
+                <td key={st}><input type="checkbox" checked={cfg.approvals[level].includes(st)} onChange={e => {
+                  const steps = e.target.checked ? [...cfg.approvals[level], st] : cfg.approvals[level].filter(x => x !== st);
+                  const order: Step[] = ["manager", "finops", "security"];
+                  setRs({ ...cfg, approvals: { ...cfg.approvals, [level]: order.filter(x => steps.includes(x)) } });
+                }} /></td>))}</tr>))}
+            </tbody>
+          </table>
+          <div className="row" style={{ marginTop: 12 }}>
+            <button disabled={!rs} onClick={() => run(async () => { await ctx.api.putRiskSettings(cfg); setRs(null); riskCfg.reload(); })}>Save risk policy</button>
+            {rs && <button className="ghost" onClick={() => setRs(null)}>Reset</button>}
+          </div>
+        </div>
+      )}
 
       <div className="panel">
         <h2>Runners</h2>
