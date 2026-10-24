@@ -100,7 +100,7 @@ function NewItem({ what, taken, onSave, onCancel }: { what: string; taken: strin
 
 function NewEnvironment({ ctx, entity, taken, onSave, onCancel }: { ctx: SectionProps["ctx"]; entity: string; taken: string[]; onSave: (b: object) => void; onCancel: () => void }) {
   const conns = useLoad(ctx.api.connections, [ctx.t.slug]);
-  const [f, setF] = useState({ name: "", tier: "nonprod", connection: "", runner_pool: "default", max_destroys: 0, allow_destroy: false });
+  const [f, setF] = useState({ name: "", tier: "nonprod", connection: "", runner_pool: "default", max_destroys: 0, max_creates: 0, max_imports: 0, allow_destroy: false });
   const usable = (conns.data ?? []).filter(c => c.entities.length === 0 || c.entities.includes(entity));
   const problem = !f.name ? "" : !slugRe.test(f.name) ? "lowercase letters, digits and dashes, e.g. dev, staging, prod" : taken.includes(f.name) ? "this product already has an environment with that name" : "";
   return (
@@ -112,6 +112,8 @@ function NewEnvironment({ ctx, entity, taken, onSave, onCancel }: { ctx: Section
           <option value="">None (modules that need no cloud)</option>{usable.map(c => <option key={c.id} value={c.name}>{c.name} ({c.cloud.provider})</option>)}</select></div>
         <div><label>Runner pool</label><input value={f.runner_pool} onChange={e => setF({ ...f, runner_pool: e.target.value })} /></div>
         <div><label>Max deletions per run</label><input type="number" min={0} value={f.max_destroys} onChange={e => setF({ ...f, max_destroys: Number(e.target.value) })} /></div>
+        <div><label>Max creates per run <span className="muted">(0 = no limit)</span></label><input type="number" min={0} value={f.max_creates} onChange={e => setF({ ...f, max_creates: Number(e.target.value) })} /></div>
+        <div><label>Max imports per run <span className="muted">(0 = no limit)</span></label><input type="number" min={0} value={f.max_imports} onChange={e => setF({ ...f, max_imports: Number(e.target.value) })} /></div>
         <div><label>Destroy runs</label><label className="row" style={{ fontWeight: 400 }}><input type="checkbox" checked={f.allow_destroy} onChange={e => setF({ ...f, allow_destroy: e.target.checked })} /> allow</label></div>
       </div>
       {problem && <div className="small del">{problem}</div>}
@@ -135,7 +137,7 @@ function EnvCard({ env, folder, tenant, units, canEdit, onDelete }: { env: Envir
           <dl className="kv small">
             <dt>Used by</dt><dd>{units.length ? units.map(u => <span key={u} className="tag">{u}</span>) : <span className="muted">no business units yet</span>}</dd>
             <dt>Runner pool</dt><dd><span className="tag">{env.runner_pool}</span></dd>
-            <dt>Guardrails</dt><dd>{env.max_destroys} deletions per run · destroy runs {env.allow_destroy ? "allowed" : "blocked"}</dd>
+            <dt>Guardrails per run</dt><dd>creates {env.max_creates || "unlimited"} · imports {env.max_imports || "unlimited"} · deletions {env.max_destroys} · destroy runs {env.allow_destroy ? "allowed" : "blocked"}</dd>
             <dt>Contracts</dt><dd className="mono small">{folder}</dd>
             <dt>Resource labels</dt><dd>{Object.entries(labels).map(([k, v]) => <span key={k} className="tag">{k}={v}</span>)}</dd>
           </dl>

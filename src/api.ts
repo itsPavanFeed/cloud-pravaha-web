@@ -28,7 +28,7 @@ export interface Connection { id: string; name: string; cloud: { provider: strin
 export interface Environment {
   id: string; name: string; entity: string; tier: "prod" | "nonprod"; connection?: string; connection_id?: string; // shared by the entity's business units
   cloud: { provider: string; auth?: string; [k: string]: unknown };
-  runner_pool: string; max_destroys: number; allow_destroy: boolean; created_by: string; created_at: string;
+  runner_pool: string; max_destroys: number; max_creates: number; max_imports: number; allow_destroy: boolean; created_by: string; created_at: string;
 }
 
 export interface ModuleRef { name: string; module: string; version?: string; inputs?: Record<string, unknown> }
