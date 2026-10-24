@@ -12,9 +12,9 @@ import Audit from "./pages/Audit";
 import TenantAdmin from "./pages/TenantAdmin";
 import Platform from "./pages/Platform";
 import Account from "./pages/Account";
-import Connections from "./pages/Connections";
 import Policies from "./pages/Policies";
 import Assistant from "./pages/Assistant";
+import Integrations from "./pages/integrations/Integrations";
 
 // Everything a tenant page needs: who is signed in, which tenant, its API,
 // and the scope filter: "" (everything visible), "entity:<slug>" or "bu:<slug>".
@@ -72,17 +72,18 @@ export default function App() {
     case "runs": body = id ? <RunDetail ctx={ctx} id={id} /> : <Runs ctx={ctx} />; break;
     case "catalog": body = <CatalogPage ctx={ctx} />; break;
     case "environments": body = <Environments ctx={ctx} />; break;
-    case "connections": body = <Connections ctx={ctx} />; break;
+    case "connections": body = <Integrations ctx={ctx} route={["cloud"]} />; break; // old link
     case "policies": body = <Policies ctx={ctx} />; break;
     case "audit": body = <Audit ctx={ctx} />; break;
     case "settings": body = <TenantAdmin ctx={ctx} />; break;
     case "assistant": body = <Assistant ctx={ctx} />; break;
+    case "integrations": body = <Integrations ctx={ctx} route={route.slice(3)} />; break;
     default: body = <Stacks ctx={ctx} />;
   }
 
   const nav: [string, string, boolean][] = t ? [
     ["stacks", "Stacks", true], ["runs", "Runs", true], ["catalog", "Module catalog", true],
-    ["environments", "Environments", true], ["connections", "Cloud connections", true], ["policies", "Policies", true], ["audit", "Audit log", true], ["assistant", "Assistant", true],
+    ["environments", "Environments", true], ["integrations", "Integrations", true], ["policies", "Policies", true], ["audit", "Audit log", true], ["assistant", "Assistant", true],
     ["settings", "Tenant settings", has(t, "tenant_admin")],
   ] : [];
 

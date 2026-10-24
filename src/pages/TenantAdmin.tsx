@@ -118,6 +118,13 @@ export default function TenantAdmin({ ctx }: { ctx: Ctx }) {
           <div><label>Branch</label><input value={ccv.branch} onChange={e => setCc({ ...ccv, branch: e.target.value })} /></div>
           <div><label>Folder</label><input value={ccv.path} onChange={e => setCc({ ...ccv, path: e.target.value })} /></div>
           <div><label>API URL <span className="muted">(GitHub Enterprise / self-hosted GitLab)</span></label><input value={ccv.api_url ?? ""} onChange={e => setCc({ ...ccv, api_url: e.target.value || undefined })} /></div>
+          {ccv.provider === "github" && (
+            <div><label>Authentication</label>
+              <select value={ccv.auth ?? "token"} onChange={e => setCc({ ...ccv, auth: e.target.value as ContractsConfig["auth"] })}>
+                <option value="token">Access token</option>
+                <option value="github_app">GitHub App (Integrations)</option>
+              </select></div>
+          )}
           <div><label>Poll every (seconds)</label><input type="number" min={30} value={ccv.poll_seconds} onChange={e => setCc({ ...ccv, poll_seconds: Number(e.target.value) })} /></div>
         </div>
         <div className="row" style={{ margin: "10px 0" }}>
@@ -127,8 +134,9 @@ export default function TenantAdmin({ ctx }: { ctx: Ctx }) {
         </div>
         <div className="row">
           <button disabled={!cc} onClick={() => run(async () => { await ctx.api.putContracts(ccv); setCc(null); contracts.reload(); })}>Save repository</button>
-          <input type="password" style={{ maxWidth: 260 }} placeholder={contracts.data?.token_set ? "token set — enter to replace" : "access token (read-only)"} value={gitToken} onChange={e => setGitToken(e.target.value)} />
-          <button className="ghost" disabled={!gitToken} onClick={() => run(async () => { await ctx.api.putContractsToken(gitToken); setGitToken(""); contracts.reload(); })}>Save token</button>
+          {(ccv.auth ?? "token") === "token" || ccv.provider !== "github" ? <><input type="password" style={{ maxWidth: 260 }} placeholder={contracts.data?.token_set ? "token set — enter to replace" : "access token (read-only)"} value={gitToken} onChange={e => setGitToken(e.target.value)} />
+          <button className="ghost" disabled={!gitToken} onClick={() => run(async () => { await ctx.api.putContractsToken(gitToken); setGitToken(""); contracts.reload(); })}>Save token</button></>
+            : <span className="muted small">Authenticates with the <a href={`#/t/${slug}/integrations`}>GitHub App</a> installation</span>}
           <button className="ghost" disabled={!contracts.data?.config} onClick={() => run(async () => { await ctx.api.syncContracts(); contracts.reload(); })}>Sync now</button>
         </div>
         {contracts.data?.status?.revision && (

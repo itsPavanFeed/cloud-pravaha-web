@@ -77,3 +77,16 @@ export const Empty = ({ children }: { children: ReactNode }) => <div className="
 const riskTone: Record<string, string> = { low: "ok", medium: "wait", high: "bad" };
 export const RiskBadge = ({ level }: { level?: string }) =>
   level ? <span className={`badge ${riskTone[level] ?? "idle"}`}>{level} risk</span> : <span className="muted">—</span>;
+
+// Page controls for server-side pagination: "1–10 of 37" with previous/next.
+export function Pager({ offset, limit, total, onPage }: { offset: number; limit: number; total: number; onPage: (offset: number) => void }) {
+  if (total <= limit) return null;
+  const pages = Math.ceil(total / limit), page = Math.floor(offset / limit) + 1;
+  return (
+    <div className="pager" role="navigation" aria-label="Pagination">
+      <button className="ghost small" disabled={offset === 0} onClick={() => onPage(Math.max(0, offset - limit))}>Previous</button>
+      <span className="small muted">{offset + 1}–{Math.min(offset + limit, total)} of {total} · page {page} of {pages}</span>
+      <button className="ghost small" disabled={offset + limit >= total} onClick={() => onPage(offset + limit)}>Next</button>
+    </div>
+  );
+}

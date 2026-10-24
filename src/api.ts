@@ -40,7 +40,7 @@ export interface Stack {
   drift: { interval_minutes: number; auto_remediate: boolean; last_check?: string };
   managed_by: "ui" | "git"; source_ref?: string;
 }
-export interface ContractsConfig { provider: "github" | "gitlab" | "local"; repo: string; branch: string; path: string; api_url?: string; poll_seconds: number; auto_plan: boolean; auto_apply_low_risk: boolean; enabled: boolean }
+export interface ContractsConfig { provider: "github" | "gitlab" | "local"; repo: string; branch: string; path: string; api_url?: string; auth?: "token" | "github_app"; poll_seconds: number; auto_plan: boolean; auto_apply_low_risk: boolean; enabled: boolean }
 export interface SyncResult { file?: string; stack?: string; action: string; run_id?: string; error?: string }
 export interface ContractsState { config: ContractsConfig | null; token_set: boolean; status: { revision: string; synced_at: string; error?: string; results: SyncResult[] | null } }
 
@@ -77,6 +77,14 @@ export interface AssistantAnswer {
   usage: { input_tokens: number; output_tokens: number; cache_read_tokens: number; model_calls: number };
 }
 
+export interface GitHubIntegration {
+  configured: boolean; private_key_set: boolean; webhook_secret_set: boolean; webhook_path: string;
+  source: "env_file" | "database"; env_file?: string;
+  config?: { app_id: number; installation_id?: number; api_url?: string; app_slug?: string };
+}
+export interface IntegrationCheck { name: string; status: "ok" | "warn" | "fail"; detail: string }
+export interface WebhookDelivery { id: number; delivery_id: string; event: string; action: string; repo: string; ref: string; sender: string; outcome: string; detail: string; received_at: string }
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details: string[] = []) { super(message); }
 }
@@ -104,7 +112,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 // Central plane: identity and directory.
 export const central = {
-  authConfig: () => fetch("/api/v1/auth/config").then(r => r.json() as Promise<{ sso: boolean; label: string }>),
+  authConfig: () => fetch("/api/v1/auth/config").then(r => r.json() as Promise<{ sso: boolean; label: string; webhook_base_url?: string }>),
   exchange: async (code: string) => {
     const r = await fetch("/api/v1/auth/exchange", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
     if (!r.ok) throw new ApiError(r.status, "This sign-in link has expired. Sign in again.");
@@ -199,6 +207,14 @@ export const tenant = (t: string) => {
         if (done) throw new ApiError(502, "the assistant stopped before answering");
       }
     },
+    github: () => call<GitHubIntegration>("GET", p("/integrations/github")),
+    putGitHub: (b: { app_id: string; installation_id: string; api_url: string; private_key: string; webhook_secret: string }) => call<GitHubIntegration>("PUT", p("/integrations/github"), b),
+    deleteGitHub: () => call<void>("DELETE", p("/integrations/github")),
+    testGitHub: () => call<{ checks: IntegrationCheck[] }>("POST", p("/integrations/github/test")),
+    githubDeliveries: (before = 0, limit = 20) =>
+      call<{ items: WebhookDelivery[]; next_before?: number }>("GET", p(`/integrations/github/deliveries?limit=${limit}${before ? `&before=${before}` : ""}`)),
+    connectionsPage: (provider: "" | "aws" | "gcp" | "azure", limit: number, offset: number) =>
+      call<{ items: Connection[]; total: number; counts: Record<string, number> }>("GET", p(`/connections?limit=${limit}&offset=${offset}${provider ? `&provider=${provider}` : ""}`)),
     runners: () => call<Runner[]>("GET", p("/runners")),
     createRunner: (r: { name: string; pool: string }) => call<{ runner: Runner; secret: string }>("POST", p("/runners"), r),
     revokeRunner: (id: string) => call<void>("DELETE", p(`/runners/${id}`)),
