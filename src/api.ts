@@ -173,7 +173,7 @@ export const tenant = (t: string) => {
       call<{ pr_number: number; html_url: string; branch: string; file: string }>("POST", p("/stacks/propose"), s),
     notifications: (before = 0, limit = 15) =>
       call<{ items: AppNotification[]; next_before?: number }>("GET", p(`/notifications?limit=${limit}${before ? `&before=${before}` : ""}`)),
-    unread: () => call<{ unread: number; latest_id: number }>("GET", p("/notifications/unread")),
+    unread: () => call<{ unread: number; latest_id: number; read_upto: number }>("GET", p("/notifications/unread")),
     markRead: (up_to: number) => call<void>("POST", p("/notifications/read"), { up_to }),
     slack: () => call<{ configured: boolean; webhook_host: string; interactive: boolean; source: string; interactivity_path: string }>("GET", p("/integrations/slack")),
     putSlack: (b: { webhook_url: string; interactive: boolean }) => call<unknown>("PUT", p("/integrations/slack"), b),
