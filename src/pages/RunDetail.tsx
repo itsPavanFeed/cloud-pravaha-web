@@ -54,7 +54,8 @@ export default function RunDetail({ ctx, id }: { ctx: Ctx; id: string }) {
     <>
       <div className="head">
         <div>
-          <div className="muted small"><Link to={`${base}stacks/${run.stack_id}`}>{run.stack}</Link> · {run.environment} · {run.entity} / <span className="tag">{run.bu}</span></div>
+          <div className="muted small"><Link to={`${base}stacks/${run.stack_id}`}>{run.stack}</Link> · {run.environment} · {run.entity} / <span className="tag">{run.bu}</span>
+            {run.pr_number && <> · {run.pr_url ? <a href={run.pr_url} target="_blank" rel="noreferrer noopener">pull request #{run.pr_number}</a> : <>pull request #{run.pr_number}</>} <span className="mono">{run.pr_sha?.slice(0, 7)}</span> (applies before merge)</>}</div>
           <h1>{run.operation === "destroy" ? "Destroy" : run.operation === "drift" ? "Drift check" : "Apply"} run <span className="mono">{run.id.slice(0, 8)}</span></h1>
         </div>
         <div className="row"><RiskBadge level={run.risk?.level} /><Status s={run.status} /></div>

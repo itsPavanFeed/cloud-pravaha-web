@@ -21,6 +21,7 @@ export default function GitHubIntegration({ ctx }: { ctx: Ctx }) {
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [showDeliveries, setShowDeliveries] = useState(false);
+  const [showPRs, setShowPRs] = useState(false);
 
   if (!gh.data) return gh.error ? <ErrorBox error={gh.error} /> : <Loading />;
   const g = gh.data;
@@ -92,6 +93,11 @@ export default function GitHubIntegration({ ctx }: { ctx: Ctx }) {
         <p className="muted small">In <a href={`#/t/${ctx.t.slug}/settings`}>Tenant settings → Contracts repository</a>, choose Authentication “GitHub App”.</p>
       </details>
 
+      <details className="panel section" onToggle={e => setShowPRs((e.target as HTMLDetailsElement).open)}>
+        <summary><h2>Pull requests</h2></summary>
+        {showPRs && <PullRequests ctx={ctx} />}
+      </details>
+
       <details className="panel section" onToggle={e => setShowDeliveries((e.target as HTMLDetailsElement).open)}>
         <summary><h2>Webhook deliveries</h2></summary>
         {showDeliveries && <Deliveries ctx={ctx} />}
@@ -129,6 +135,40 @@ function Deliveries({ ctx }: { ctx: Ctx }) {
         <button className="ghost small" disabled={!page.data.next_before} onClick={() => setCursors([...cursors, page.data!.next_before!])}>Older</button>
       </div>
       <p className="muted small">Only deliveries with a valid signature are recorded; rejected ones appear in GitHub’s log with status 401.</p>
+    </>
+  );
+}
+
+const prTone: Record<string, string> = { open: "busy", merged: "ok", closed: "idle", applied: "wait" };
+const resultTone: Record<string, string> = { planned: "busy", unchanged: "idle", error: "bad", locked: "wait", skipped: "idle" };
+
+// Pull requests against the contracts branch: each is planned, approved and
+// applied before it merges.
+function PullRequests({ ctx }: { ctx: Ctx }) {
+  const prs = useLoad(() => ctx.api.pullRequests(20), [ctx.t.slug], 15000);
+  const [error, setError] = useState<unknown>(null);
+  if (!prs.data) return prs.error ? <ErrorBox error={prs.error} /> : <Loading />;
+  if (prs.data.length === 0) return <Empty>No pull requests yet. Open one against the contracts branch, or use “Open a pull request” in New stack.</Empty>;
+  return (
+    <>
+      <ErrorBox error={error} />
+      <p className="muted small">Changes are applied before merging. Require the <span className="mono">pravaha/apply</span> status in the branch protection of the contracts branch so nobody merges earlier.</p>
+      <table>
+        <thead><tr><th>Pull request</th><th>State</th><th>Stacks</th><th>Updated</th><th /></tr></thead>
+        <tbody>{prs.data.map(p => (
+          <tr key={p.number}>
+            <td><a href={p.html_url} target="_blank" rel="noreferrer noopener">#{p.number}</a> {p.title}<div className="small muted">{p.author} · <span className="mono">{p.head_sha.slice(0, 7)}</span></div></td>
+            <td><span className={`badge ${prTone[p.state] ?? "idle"}`}>{p.state}</span></td>
+            <td className="small">{p.results.map((r, i) => (
+              <div key={i}>{r.stack ?? r.file ?? "—"} <span className={`badge ${resultTone[r.action] ?? "idle"}`}>{r.action}</span>
+                {r.run_id && <> <a href={`#/t/${ctx.t.slug}/runs/${r.run_id}`}>run</a></>}
+                {r.error && <span className="muted"> {r.error}</span>}</div>
+            ))}</td>
+            <td className="small"><Time iso={p.updated_at} /></td>
+            <td>{p.state === "open" && <button className="ghost small" onClick={async () => { setError(null); try { await ctx.api.replanPR(p.number); prs.reload(); } catch (e) { setError(e); } }}>Plan again</button>}</td>
+          </tr>
+        ))}</tbody>
+      </table>
     </>
   );
 }

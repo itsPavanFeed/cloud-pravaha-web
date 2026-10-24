@@ -15,6 +15,7 @@ const Policies = lazy(() => import("./pages/Policies"));
 const Assistant = lazy(() => import("./pages/Assistant"));
 const Integrations = lazy(() => import("./pages/integrations/Integrations"));
 const Settings = lazy(() => import("./pages/settings/Settings"));
+import Bell from "./components/Bell";
 
 // Tenant admins see every settings section; entity (product) admins see
 // Organisation, where they manage their products' shared environments.
@@ -94,7 +95,7 @@ export default function App() {
   return (
     <div className="shell">
       <nav className="side" aria-label="Main">
-        <div className="brand"><img src="/favicon.svg" alt="" /> Cloud Pravaha</div>
+        <div className="brand"><img src="/favicon.svg" alt="" /> Cloud Pravaha {ctx && <Bell ctx={ctx} />}</div>
         {me.tenants.length > 0 && (
           <div className="switcher">
             <label htmlFor="tenant-pick">Tenant</label>

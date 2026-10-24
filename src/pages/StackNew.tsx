@@ -59,6 +59,10 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
   const [error, setError] = useState<unknown>(null);
   const [seq, setSeq] = useState(1);
   const [imports, setImports] = useState("");
+  const [proposed, setProposed] = useState<{ pr_number: number; html_url: string; file: string } | null>(null);
+  // With a GitHub contracts repository on the app, stacks are proposed as pull requests (Git stays the source of truth).
+  const contracts = useLoad(api.contracts, [ctx.t.slug]);
+  const viaGit = contracts.data?.config?.provider === "github" && contracts.data.config.auth === "github_app";
 
   useEffect(() => {
     if (!catalog.data || !envs.data) return;
@@ -126,6 +130,12 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
     const spec = build();
     if (!spec) return;
     try { setPreview(await api.preview({ name: name || "preview", bu: unit?.slug ?? "", environment: env, spec })); } catch (e) { setError(e); }
+  };
+  const proposeViaPR = async () => {
+    setError(null);
+    const spec = build();
+    if (!spec) return;
+    try { setProposed(await api.propose({ name, bu: unit?.slug ?? "", environment: env, spec })); } catch (e) { setError(e); }
   };
   const create = async () => {
     setError(null);
@@ -235,7 +245,16 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
         </div>
       )}
       {env && instances.length > 0 && (
-        <div className="row"><button className="ghost" onClick={doPreview}>Preview configuration</button><button disabled={!name} onClick={create}>Create stack</button></div>
+        proposed ? (
+          <div className="notice">Pull request <a href={proposed.html_url} target="_blank" rel="noreferrer noopener">#{proposed.pr_number}</a> opened with <span className="mono">{proposed.file}</span>. It is planned now; after the required approvals it is applied and then merged.</div>
+        ) : (
+          <div className="row"><button className="ghost" onClick={doPreview}>Preview configuration</button>
+            {viaGit ? <>
+              <button disabled={!name} onClick={proposeViaPR}>Open a pull request</button>
+              <span className="muted small">to {contracts.data?.config?.repo}; applied before it merges</span>
+            </> : <button disabled={!name} onClick={create}>Create stack</button>}
+          </div>
+        )
       )}
     </>
   );

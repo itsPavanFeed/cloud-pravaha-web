@@ -57,6 +57,16 @@ export interface Run {
   policy_result?: { passed: boolean; violations: Violation[] | null };
   risk?: Risk; cost?: CostEstimate; required_approvals: Step[]; approvals: Approval[];
   error?: string; created_at: string; updated_at: string; planned_at?: string; finished_at?: string;
+  pr_number?: number; pr_sha?: string; pr_url?: string; // pull-request runs plan the pull request's spec
+}
+export interface PullRequest {
+  number: number; repo: string; title: string; author: string; html_url: string; head_sha: string; state: string;
+  results: { file?: string; stack?: string; bu?: string; environment?: string; action: string; run_id?: string; error?: string }[];
+  created_at: string; updated_at: string; merged_at?: string;
+}
+export interface AppNotification {
+  id: number; kind: string; severity: "info" | "action" | "success" | "warning" | "error"; title: string; body: string;
+  link: string; bu: string; entity: string; run_id?: string; steps: string[]; created_at: string;
 }
 export interface LogChunk { seq: number; ts: string; chunk: string }
 export interface AuditEvent { id: number; ts: string; actor: string; action: string; target: string; scope?: string; payload: unknown; hash: string }
@@ -134,6 +144,9 @@ export const central = {
   createBU: (t: string, slug: string, name: string, entity: string) => call<BU>("POST", `/api/v1/tenants/${t}/bus`, { slug, name, entity }),
   addMember: (t: string, m: { email: string; role: string; entity?: string; bu?: string }) => call<Membership>("POST", `/api/v1/tenants/${t}/members`, m),
   removeMember: (t: string, id: string) => call<void>("DELETE", `/api/v1/tenants/${t}/members/${id}`),
+  slackApp: (t: string) => call<{ configured: boolean; interactivity_url: string; updated_by?: string; updated_at?: string }>("GET", `/api/v1/tenants/${t}/slack`),
+  putSlackApp: (t: string, b: { signing_secret: string; bot_token: string }) => call<unknown>("PUT", `/api/v1/tenants/${t}/slack`, b),
+  deleteSlackApp: (t: string) => call<void>("DELETE", `/api/v1/tenants/${t}/slack`),
   memberToken: (t: string, email: string, name: string, ttl_days: number) =>
     call<{ secret: string; user: string }>("POST", `/api/v1/tenants/${t}/tokens`, { email, name, ttl_days }),
 };
@@ -156,6 +169,18 @@ export const tenant = (t: string) => {
     stack: (id: string) => call<Stack>("GET", p(`/stacks/${id}`)),
     createStack: (s: { name: string; bu: string; environment: string; spec: StackSpec }) => call<Stack>("POST", p("/stacks"), s),
     updateStack: (id: string, spec: StackSpec) => call<Stack>("PUT", p(`/stacks/${id}`), { spec }),
+    propose: (s: { name: string; bu: string; environment: string; spec: StackSpec }) =>
+      call<{ pr_number: number; html_url: string; branch: string; file: string }>("POST", p("/stacks/propose"), s),
+    notifications: (before = 0, limit = 15) =>
+      call<{ items: AppNotification[]; next_before?: number }>("GET", p(`/notifications?limit=${limit}${before ? `&before=${before}` : ""}`)),
+    unread: () => call<{ unread: number; latest_id: number }>("GET", p("/notifications/unread")),
+    markRead: (up_to: number) => call<void>("POST", p("/notifications/read"), { up_to }),
+    slack: () => call<{ configured: boolean; webhook_host: string; interactive: boolean; source: string; interactivity_path: string }>("GET", p("/integrations/slack")),
+    putSlack: (b: { webhook_url: string; interactive: boolean }) => call<unknown>("PUT", p("/integrations/slack"), b),
+    deleteSlack: () => call<void>("DELETE", p("/integrations/slack")),
+    testSlack: () => call<void>("POST", p("/integrations/slack/test")),
+    pullRequests: (limit = 20) => call<PullRequest[]>("GET", p(`/pull-requests?limit=${limit}`)),
+    replanPR: (n: number) => call<PullRequest>("POST", p(`/pull-requests/${n}/plan`)),
     preview: (s: { name: string; bu: string; environment: string; spec: StackSpec }) =>
       call<{ valid: boolean; problems?: string[]; files?: Record<string, string>; providers?: string[]; hash?: string }>("POST", p("/stacks/preview"), s),
     stackRuns: (id: string) => call<Run[]>("GET", p(`/stacks/${id}/runs`)),
