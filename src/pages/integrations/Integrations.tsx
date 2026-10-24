@@ -1,12 +1,12 @@
-import { Suspense, lazy } from "react";
+import { Suspense } from "react";
 import type { Ctx } from "../../App";
 import { has } from "../../api";
-import { ErrorBox, Loading, go, useLoad } from "../../ui";
+import { ErrorBox, Loading, go, useLoad, lazyPage } from "../../ui";
 
 // Each tab is its own chunk, fetched (with its data) only when opened.
-const GitHub = lazy(() => import("./GitHub"));
-const Cloud = lazy(() => import("./Cloud"));
-const Slack = lazy(() => import("./Slack"));
+const GitHub = lazyPage(() => import("./GitHub"));
+const Cloud = lazyPage(() => import("./Cloud"));
+const Slack = lazyPage(() => import("./Slack"));
 
 type Tab = "github" | "cloud" | "slack";
 type Provider = "" | "aws" | "gcp" | "azure";

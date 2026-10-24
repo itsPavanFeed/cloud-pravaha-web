@@ -15,5 +15,6 @@ export default defineConfig({
       "/.well-known": { target, changeOrigin: true, secure: false },
     },
   },
-  build: { outDir: "dist", sourcemap: false },
+  // assetsInlineLimit 0: never inline assets as data: URLs (the console's CSP allows only 'self')
+  build: { outDir: "dist", sourcemap: false, assetsInlineLimit: 0 },
 });

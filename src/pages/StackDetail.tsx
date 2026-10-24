@@ -12,9 +12,9 @@ export default function StackDetail({ ctx, id }: { ctx: Ctx; id: string }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
   const [actionError, setActionError] = useState<unknown>(null);
+  const [drift, setDrift] = useState<{ interval_minutes: number; auto_remediate: boolean } | null>(null);
 
   if (!stack) return error ? <ErrorBox error={error} /> : <Loading />;
-  const [drift, setDrift] = useState<{ interval_minutes: number; auto_remediate: boolean } | null>(null);
   const start = async (op: "apply" | "destroy" | "drift") => {
     setActionError(null);
     try { const r = await api.createRun(stack.id, op); go(`t/${ctx.t.slug}/runs/${r.id}`); } catch (e) { setActionError(e); }

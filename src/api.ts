@@ -38,7 +38,7 @@ export interface Stack {
   id: string; name: string; bu: string; entity: string; environment: string; environment_id: string; spec: StackSpec;
   created_by: string; created_at: string; updated_at: string; last_run?: RunBrief;
   drift: { interval_minutes: number; auto_remediate: boolean; last_check?: string };
-  managed_by: "ui" | "git"; source_ref?: string;
+  managed_by: "ui" | "git"; source_ref?: string; pr_number?: number; // proposed by this open pull request
 }
 export interface ContractsConfig { provider: "github" | "gitlab" | "local"; repo: string; branch: string; path: string; api_url?: string; auth?: "token" | "github_app"; layout?: "flat" | "nested"; poll_seconds: number; auto_plan: boolean; auto_apply_low_risk: boolean; enabled: boolean }
 export interface SyncResult { file?: string; stack?: string; action: string; run_id?: string; error?: string }

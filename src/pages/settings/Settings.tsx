@@ -1,14 +1,14 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, useState } from "react";
 import type { Ctx } from "../../App";
 import { central, has } from "../../api";
-import { Copy, Loading, go, useLoad } from "../../ui";
+import { Copy, Loading, go, useLoad, lazyPage } from "../../ui";
 
 // One section at a time, each its own chunk.
-const Organisation = lazy(() => import("./Organisation"));
-const People = lazy(() => import("./People"));
-const Contracts = lazy(() => import("./Contracts"));
-const Risk = lazy(() => import("./Risk"));
-const Runners = lazy(() => import("./Runners"));
+const Organisation = lazyPage(() => import("./Organisation"));
+const People = lazyPage(() => import("./People"));
+const Contracts = lazyPage(() => import("./Contracts"));
+const Risk = lazyPage(() => import("./Risk"));
+const Runners = lazyPage(() => import("./Runners"));
 
 export type Secret = { label: string; value: string } | null;
 export type SectionProps = { ctx: Ctx; showSecret: (s: Secret) => void };

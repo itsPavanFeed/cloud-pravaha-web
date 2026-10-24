@@ -54,7 +54,7 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
   const [name, setName] = useState("");
   const [env, setEnv] = useState("");
   const [instances, setInstances] = useState<Instance[]>([]);
-  const [picker, setPicker] = useState("");
+  const [q, setQ] = useState("");
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof api.preview>> | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [seq, setSeq] = useState(1);
@@ -98,7 +98,7 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
     let n = base, i = 2;
     while (instances.some(x => x.name === n)) n = `${base}_${i++}`;
     setInstances([...instances, { key: seq, name: n, module: m.id, version: m.versions[m.versions.length - 1], fields: Object.fromEntries(m.inputs.map(inp => [inp.name, blank(inp)])), outputs: [] }]);
-    setSeq(seq + 1); setPicker(""); setPreview(null);
+    setSeq(seq + 1); setPreview(null);
   };
   const update = (key: number, fn: (i: Instance) => Instance) => { setInstances(instances.map(i => (i.key === key ? fn(i) : i))); setPreview(null); };
 
@@ -148,23 +148,64 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
 
   return (
     <>
-      <div className="head"><div><h1>New stack</h1><div className="muted">Compose approved public modules. The stack belongs to a business unit and deploys to one of its product’s environments; versions are pinned and security baselines are applied automatically.</div></div></div>
-      <div className="panel">
-        <div className="grid">
-          <div><label htmlFor="sn">Stack name</label><input id="sn" value={name} onChange={e => setName(e.target.value)} placeholder="payments-network" pattern="[a-z][a-z0-9-]{1,62}" /></div>
-          <div><label htmlFor="sb">Business unit</label>
-            <select id="sb" value={unit?.slug ?? ""} onChange={e => { setBu(e.target.value); setEnv(""); setInstances([]); setPreview(null); }}>
-              {units.length !== 1 && <option value="">Choose…</option>}
-              {units.map(b => <option key={b.slug} value={b.slug}>{b.entityName} / {b.name}</option>)}
-            </select></div>
-          <div><label htmlFor="se">Environment <span className="muted">— shared by {unit ? unit.entityName : "the product"}’s business units</span></label>
-            <select id="se" value={env} disabled={!unit} onChange={e => { setEnv(e.target.value); setInstances([]); setPreview(null); }}>
-              <option value="">Choose…</option>
-              {writable.map(e => <option key={e.id} value={e.name}>{e.name} ({e.connection || "no cloud"}, {e.tier})</option>)}
-            </select></div>
-        </div>
-      </div>
+      <div className="head"><div><h1>New stack</h1><div className="muted">Compose approved public modules. Versions are pinned and security baselines are applied automatically.</div></div></div>
 
+      <section className="panel stepbox">
+        <h2><span className="step-n on">1</span> Where it deploys</h2>
+        {units.length === 0 ? <p className="muted">You cannot create stacks: you need the developer or admin role in a business unit.</p> : (
+          <div className="grid">
+            <div><label htmlFor="sn">Stack name</label><input id="sn" value={name} onChange={e => setName(e.target.value.toLowerCase())} placeholder="payments-network" />
+              {name && !/^[a-z][a-z0-9-]{1,62}$/.test(name) && <div className="small del">Lowercase letters, digits and dashes, starting with a letter.</div>}</div>
+            <div><label htmlFor="sb">Business unit</label>
+              <select id="sb" value={unit?.slug ?? ""} onChange={e => { setBu(e.target.value); setEnv(""); setInstances([]); setPreview(null); }}>
+                {units.length !== 1 && <option value="">Choose…</option>}
+                {units.map(b => <option key={b.slug} value={b.slug}>{b.entityName} / {b.name}</option>)}
+              </select></div>
+            <div><label htmlFor="se">Environment</label>
+              <select id="se" value={env} disabled={!unit} onChange={e => { setEnv(e.target.value); setInstances([]); setPreview(null); }}>
+                <option value="">{unit ? "Choose…" : "Choose a business unit first"}</option>
+                {writable.map(e => <option key={e.id} value={e.name}>{e.name} — {e.tier}{e.connection ? `, ${e.connection}` : ", no cloud"}</option>)}
+              </select>
+              {unit && writable.length === 0 && <div className="small del">{unit.entityName} has no environments yet. A tenant or product admin adds them in Tenant settings → Organisation.</div>}</div>
+          </div>
+        )}
+        {environment && (
+          <p className="small muted" style={{ marginBottom: 0 }}>
+            Shared by all business units of {unit?.entityName} ·{" "}
+            <span className={`badge ${environment.tier === "prod" ? "wait" : "idle"}`}>{environment.tier}</span>{" "}
+            {environment.connection ? <>cloud <strong>{environment.cloud.provider}</strong> via {environment.connection}</> : "no cloud connection"} · runner pool <span className="tag">{environment.runner_pool}</span>
+          </p>
+        )}
+      </section>
+
+      <section className={`panel stepbox ${env ? "" : "dim"}`}>
+        <h2><span className={`step-n ${env ? "on" : ""}`}>2</span> Modules</h2>
+        {!env ? <p className="muted">Choose an environment first: it decides which cloud’s modules can be used.</p> : (
+          <>
+            {!cloud || cloud === "none" ? (
+              <p className="small muted">This environment has no cloud connection, so only modules that need no cloud are offered. Pick an environment with an AWS, GCP or Azure connection to use cloud modules.</p>
+            ) : <p className="small muted">Showing modules for <strong>{cloud}</strong> and cloud-independent ones.</p>}
+            <input type="search" placeholder="Search modules" value={q} onChange={e => setQ(e.target.value)} style={{ maxWidth: 320, marginBottom: 10 }} />
+            <div className="module-grid">
+              {available.filter(m => !q || `${m.title} ${m.id} ${m.source}`.toLowerCase().includes(q.toLowerCase())).map(m => {
+                const count = instances.filter(i => i.module === m.id).length;
+                return (
+                  <div key={m.id} className="card module-card">
+                    <div className="row" style={{ justifyContent: "space-between" }}>
+                      <strong>{m.title}</strong>
+                      <span className="badge idle">{m.cloud || "any cloud"}</span>
+                    </div>
+                    <span className="mono small muted">{m.source}</span>
+                    <button className={count ? "ghost small" : "small"} onClick={() => add(m)}>{count ? `Add another (${count} added)` : "Add"}</button>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
+
+      {env && instances.length > 0 && <h2 className="step-title"><span className="step-n on">3</span> Configure</h2>}
       {env && instances.map(inst => {
         const m = mods.get(inst.module)!;
         return (
@@ -215,25 +256,15 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
         );
       })}
 
-      {env && (
-        <div className="panel">
-          <label htmlFor="pick">Add a module</label>
-          <div className="row">
-            <select id="pick" style={{ maxWidth: 420 }} value={picker} onChange={e => setPicker(e.target.value)}>
-              <option value="">Choose from the catalog…</option>
-              {available.map(m => <option key={m.id} value={m.id}>{m.title} — {m.source}</option>)}
-            </select>
-            <button className="ghost" disabled={!picker} onClick={() => add(mods.get(picker)!)}>Add</button>
-          </div>
-        </div>
-      )}
-
       {env && instances.length > 0 && (
-        <div className="panel">
-          <h2>Import existing resources <span className="muted small">(optional — backporting)</span></h2>
-          <p className="muted small">Adopt resources that already exist in the cloud instead of creating them. One per line: an address inside one of the modules above, then its cloud ID. Imports raise the run's risk, and an import the plan would replace is blocked.</p>
-          <textarea value={imports} onChange={e => setImports(e.target.value)} placeholder={"module.network.aws_vpc.this[0] = vpc-0a1b2c3d4e5f67890"} spellCheck={false} />
-        </div>
+        <>
+          <h2 className="step-title"><span className="step-n on">4</span> Review and create</h2>
+          <details className="panel section">
+            <summary><h2>Import existing resources <span className="muted small">(optional — backporting)</span></h2></summary>
+            <p className="muted small">Adopt resources that already exist in the cloud instead of creating them. One per line: an address inside one of the modules above, then its cloud ID. Imports raise the run's risk, and an import the plan would replace is blocked.</p>
+            <textarea value={imports} onChange={e => setImports(e.target.value)} placeholder={"module.network.aws_vpc.this[0] = vpc-0a1b2c3d4e5f67890"} spellCheck={false} />
+          </details>
+        </>
       )}
       <ErrorBox error={error} />
       {preview && !preview.valid && <div className="error"><strong>The spec was rejected</strong><ul>{preview.problems?.map((p, i) => <li key={i}>{p}</li>)}</ul></div>}
@@ -248,11 +279,13 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
         proposed ? (
           <div className="notice">Pull request <a href={proposed.html_url} target="_blank" rel="noreferrer noopener">#{proposed.pr_number}</a> opened with <span className="mono">{proposed.file}</span>. It is planned now; after the required approvals it is applied and then merged.</div>
         ) : (
-          <div className="row"><button className="ghost" onClick={doPreview}>Preview configuration</button>
-            {viaGit ? <>
-              <button disabled={!name} onClick={proposeViaPR}>Open a pull request</button>
-              <span className="muted small">to {contracts.data?.config?.repo}; applied before it merges</span>
-            </> : <button disabled={!name} onClick={create}>Create stack</button>}
+          <div className="action-bar">
+            <span className="small muted">{instances.length} module{instances.length === 1 ? "" : "s"} · {unit?.name} · {env}{!name && " · give the stack a name"}</span>
+            <div className="row">
+              <button className="ghost" onClick={doPreview}>Preview configuration</button>
+              {viaGit ? <button disabled={!name} onClick={proposeViaPR} title={`to ${contracts.data?.config?.repo}; applied before it merges`}>Open a pull request</button>
+                : <button disabled={!name} onClick={create}>Create stack</button>}
+            </div>
           </div>
         )
       )}

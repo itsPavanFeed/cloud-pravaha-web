@@ -1,20 +1,20 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { central, has, session, tenant as tenantApi, type Me, type MeTenant } from "./api";
-import { ErrorBox, Link, go, useRoute } from "./ui";
+import { ErrorBox, Link, go, useRoute, lazyPage } from "./ui";
 // Each page is its own chunk, downloaded the first time it is opened.
-const Stacks = lazy(() => import("./pages/Stacks"));
-const StackNew = lazy(() => import("./pages/StackNew"));
-const StackDetail = lazy(() => import("./pages/StackDetail"));
-const Runs = lazy(() => import("./pages/Runs"));
-const RunDetail = lazy(() => import("./pages/RunDetail"));
-const CatalogPage = lazy(() => import("./pages/Catalog"));
-const Audit = lazy(() => import("./pages/Audit"));
-const Platform = lazy(() => import("./pages/Platform"));
-const Account = lazy(() => import("./pages/Account"));
-const Policies = lazy(() => import("./pages/Policies"));
-const Assistant = lazy(() => import("./pages/Assistant"));
-const Integrations = lazy(() => import("./pages/integrations/Integrations"));
-const Settings = lazy(() => import("./pages/settings/Settings"));
+const Stacks = lazyPage(() => import("./pages/Stacks"));
+const StackNew = lazyPage(() => import("./pages/StackNew"));
+const StackDetail = lazyPage(() => import("./pages/StackDetail"));
+const Runs = lazyPage(() => import("./pages/Runs"));
+const RunDetail = lazyPage(() => import("./pages/RunDetail"));
+const CatalogPage = lazyPage(() => import("./pages/Catalog"));
+const Audit = lazyPage(() => import("./pages/Audit"));
+const Platform = lazyPage(() => import("./pages/Platform"));
+const Account = lazyPage(() => import("./pages/Account"));
+const Policies = lazyPage(() => import("./pages/Policies"));
+const Assistant = lazyPage(() => import("./pages/Assistant"));
+const Integrations = lazyPage(() => import("./pages/integrations/Integrations"));
+const Settings = lazyPage(() => import("./pages/settings/Settings"));
 import Bell from "./components/Bell";
 
 // Tenant admins see every settings section; entity (product) admins see

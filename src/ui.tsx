@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode, lazy, type ComponentType } from "react";
 import { ApiError } from "./api";
 
 // ---- hash routing (no router dependency) ----
@@ -89,4 +89,17 @@ export function Pager({ offset, limit, total, onPage }: { offset: number; limit:
       <button className="ghost small" disabled={offset + limit >= total} onClick={() => onPage(offset + limit)}>Next</button>
     </div>
   );
+}
+
+// lazyPage loads a page's code on demand. After a new release, the browser may
+// still ask for an old chunk: reload once to pick up the new build instead of
+// leaving a blank page.
+export function lazyPage<T extends ComponentType<any>>(load: () => Promise<{ default: T }>) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  return lazy(() => load().then(m => { sessionStorage.removeItem("pravaha.reloaded"); return m; }, err => {
+    if (!sessionStorage.getItem("pravaha.reloaded")) {
+      sessionStorage.setItem("pravaha.reloaded", "1");
+      window.location.reload();
+    }
+    throw err;
+  }));
 }
