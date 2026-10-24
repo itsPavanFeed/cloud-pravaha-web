@@ -69,6 +69,14 @@ export interface PolicySet { id: string; name: string; scope: string; level: "ha
 export interface BU { id: string; slug: string; name: string; entity: string; created_by: string; created_at: string }
 export interface Membership { id: string; email: string; tenant: string; entity?: string; bu?: string; role: string; created_by: string; created_at: string }
 
+export interface AssistantTurn { role: "user" | "assistant"; text: string }
+export interface AssistantSource { id: string; kind: string; title: string }
+export interface AssistantAnswer {
+  text: string; sources: AssistantSource[]; declined?: boolean;
+  draft?: { name: string; environment: string; spec: StackSpec };
+  usage: { input_tokens: number; output_tokens: number; cache_read_tokens: number; model_calls: number };
+}
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public details: string[] = []) { super(message); }
 }
@@ -161,6 +169,36 @@ export const tenant = (t: string) => {
     testPolicy: (module: string, run_id: string) => call<Violation[] | null>("POST", p("/policies/test"), { module, run_id }),
     riskSettings: () => call<RiskSettings>("GET", p("/settings/risk")),
     putRiskSettings: (r: RiskSettings) => call<RiskSettings>("PUT", p("/settings/risk"), r),
+    assistantInfo: () => call<{ enabled: boolean; model: string }>("GET", p("/assistant")),
+    // Streams status lines while the assistant works, then resolves with the answer.
+    ask: async (question: string, history: AssistantTurn[], onStatus: (s: string) => void, signal?: AbortSignal): Promise<AssistantAnswer> => {
+      const res = await fetch(p("/assistant/ask"), {
+        method: "POST", signal, credentials: "same-origin", cache: "no-store",
+        headers: { Authorization: `Bearer ${session.get()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ question, history }),
+      });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new ApiError(res.status, data.error ?? res.statusText, data.details ?? []);
+      }
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buf = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (value) buf += value;
+        let nl;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          const ev = JSON.parse(line);
+          if (ev.type === "status") onStatus(ev.text);
+          else if (ev.type === "answer") return ev.answer as AssistantAnswer;
+          else if (ev.type === "error") throw new ApiError(502, ev.error);
+        }
+        if (done) throw new ApiError(502, "the assistant stopped before answering");
+      }
+    },
     runners: () => call<Runner[]>("GET", p("/runners")),
     createRunner: (r: { name: string; pool: string }) => call<{ runner: Runner; secret: string }>("POST", p("/runners"), r),
     revokeRunner: (id: string) => call<void>("DELETE", p(`/runners/${id}`)),

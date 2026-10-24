@@ -99,3 +99,16 @@ pre.code, pre.log { background: var(--code-bg); color: var(--code-ink); border-r
 .step.done { border-color: var(--ok); background: var(--ok-soft); }
 .step-n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: var(--idle-soft); color: var(--muted); flex: none; }
 .step.done .step-n { background: var(--ok); color: #fff; }
+
+/* assistant */
+.chat-q { margin: 18px 0 8px auto; max-width: 80%; width: fit-content; background: var(--accent-soft); color: var(--text); padding: 10px 14px; border-radius: var(--radius); white-space: pre-wrap; }
+.chat-a .md > :first-child { margin-top: 0; } .chat-a .md > :last-child { margin-bottom: 0; }
+.chat-a .md h3 { font-size: 15px; margin: 14px 0 6px; }
+.chat-a .md ul, .chat-a .md ol { padding-left: 22px; }
+.cite { font-family: var(--mono); font-size: 11px; padding: 0 5px; border-radius: 5px; background: var(--idle-soft); color: var(--muted); white-space: nowrap; }
+.draft { margin-top: 14px; padding: 12px; border: 1px dashed var(--accent); border-radius: var(--radius); display: grid; gap: 8px; justify-items: start; }
+.draft details { width: 100%; } .draft pre { max-height: 320px; overflow: auto; }
+.sources { margin-top: 12px; }
+.chat-box { position: sticky; bottom: 12px; display: grid; gap: 8px; }
+.chat-box textarea { width: 100%; resize: vertical; font-family: var(--font); font-size: 14px; min-height: 64px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

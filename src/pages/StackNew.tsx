@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { inScope, type Ctx } from "../App";
 import { canChange, type CatalogInput, type CatalogModule, type StackSpec } from "../api";
 import { ErrorBox, Loading, go, useLoad } from "../ui";
@@ -29,6 +29,19 @@ function convert(inp: CatalogInput, f: Field): { set: boolean; value?: unknown; 
   }
 }
 
+// A draft handed over by the assistant (validated there, but reviewed and submitted here).
+export const DRAFT_KEY = "pravaha.draft";
+type Draft = { tenant: string; name: string; environment: string; spec: StackSpec };
+
+function fieldFrom(inp: CatalogInput, v: unknown): Field {
+  const f = blank(inp);
+  if (v === undefined) return f;
+  if (v && typeof v === "object" && "$ref" in (v as Record<string, unknown>)) return { ...f, mode: "ref", ref: String((v as Record<string, unknown>).$ref) };
+  if (inp.type === "bool") return { ...f, bool: v === true };
+  if (Array.isArray(v) && inp.type.startsWith("list(")) return { ...f, text: v.join(", ") };
+  return { ...f, text: typeof v === "object" ? JSON.stringify(v) : String(v) };
+}
+
 export default function StackNew({ ctx }: { ctx: Ctx }) {
   const api = ctx.api;
   const catalog = useLoad(api.catalog, [ctx.t.slug]);
@@ -42,6 +55,28 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
   const [error, setError] = useState<unknown>(null);
   const [seq, setSeq] = useState(1);
   const [imports, setImports] = useState("");
+
+  useEffect(() => {
+    if (!catalog.data || !envs.data) return;
+    let d: Draft | null = null;
+    try { d = JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "null"); sessionStorage.removeItem(DRAFT_KEY); } catch { d = null; }
+    if (!d || d.tenant !== ctx.t.slug) return;
+    const byId = new Map(catalog.data.modules.map(m => [m.id, m]));
+    let k = seq;
+    const insts: Instance[] = [];
+    for (const ref of d.spec.modules ?? []) {
+      const m = byId.get(ref.module);
+      if (!m) continue;
+      insts.push({
+        key: k++, name: ref.name, module: m.id, version: ref.version || m.versions[m.versions.length - 1],
+        fields: Object.fromEntries(m.inputs.map(inp => [inp.name, fieldFrom(inp, ref.inputs?.[inp.name])])),
+        outputs: (d.spec.outputs ?? []).filter(o => o.module === ref.name).map(o => o.output),
+      });
+    }
+    setName(d.name); setEnv(d.environment); setInstances(insts); setSeq(k);
+    setImports((d.spec.imports ?? []).map(i => `${i.to} = ${i.id}`).join("\n"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalog.data, envs.data]);
 
   const environment = envs.data?.find(e => e.name === env);
   const cloud = environment?.cloud.provider ?? "";
@@ -126,7 +161,7 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
             {m.inputs.map(inp => {
               const f = inst.fields[inp.name];
               const set = (p: Partial<Field>) => update(inst.key, i => ({ ...i, fields: { ...i.fields, [inp.name]: { ...f, ...p } } }));
-              const refs = inp.type === "string" ? refOptions(inst.name) : [];
+              const refs = inp.type !== "bool" ? refOptions(inst.name) : [];
               return (
                 <div key={inp.name}>
                   <label>{inp.name}{inp.required && " *"} <span className="muted">{inp.type} — {inp.description}</span></label>
