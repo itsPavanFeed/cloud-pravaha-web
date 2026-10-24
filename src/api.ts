@@ -40,7 +40,7 @@ export interface Stack {
   drift: { interval_minutes: number; auto_remediate: boolean; last_check?: string };
   managed_by: "ui" | "git"; source_ref?: string;
 }
-export interface ContractsConfig { provider: "github" | "gitlab" | "local"; repo: string; branch: string; path: string; api_url?: string; auth?: "token" | "github_app"; poll_seconds: number; auto_plan: boolean; auto_apply_low_risk: boolean; enabled: boolean }
+export interface ContractsConfig { provider: "github" | "gitlab" | "local"; repo: string; branch: string; path: string; api_url?: string; auth?: "token" | "github_app"; layout?: "flat" | "nested"; poll_seconds: number; auto_plan: boolean; auto_apply_low_risk: boolean; enabled: boolean }
 export interface SyncResult { file?: string; stack?: string; action: string; run_id?: string; error?: string }
 export interface ContractsState { config: ContractsConfig | null; token_set: boolean; status: { revision: string; synced_at: string; error?: string; results: SyncResult[] | null } }
 
@@ -150,6 +150,8 @@ export const tenant = (t: string) => {
     environments: () => call<Environment[]>("GET", p("/environments")),
     environment: (id: string) => call<{ environment: Environment; oidc?: { issuer: string; audience: string; subject_pattern: string } }>("GET", p(`/environments/${id}`)),
     createEnvironment: (e: unknown) => call<Environment>("POST", p("/environments"), e),
+    updateEnvironment: (id: string, e: unknown) => call<Environment>("PUT", p(`/environments/${id}`), e),
+    deleteEnvironment: (id: string) => call<void>("DELETE", p(`/environments/${id}`)),
     stacks: () => call<Stack[]>("GET", p("/stacks")),
     stack: (id: string) => call<Stack>("GET", p(`/stacks/${id}`)),
     createStack: (s: { name: string; environment: string; spec: StackSpec }) => call<Stack>("POST", p("/stacks"), s),

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { central, has, session, tenant as tenantApi, type Me, type MeTenant } from "./api";
+import { central, session, tenant as tenantApi, type Me, type MeTenant } from "./api";
 import { ErrorBox, Link, go, useRoute } from "./ui";
 import Stacks from "./pages/Stacks";
 import StackNew from "./pages/StackNew";
@@ -7,14 +7,13 @@ import StackDetail from "./pages/StackDetail";
 import Runs from "./pages/Runs";
 import RunDetail from "./pages/RunDetail";
 import CatalogPage from "./pages/Catalog";
-import Environments from "./pages/Environments";
 import Audit from "./pages/Audit";
-import TenantAdmin from "./pages/TenantAdmin";
 import Platform from "./pages/Platform";
 import Account from "./pages/Account";
 import Policies from "./pages/Policies";
 import Assistant from "./pages/Assistant";
 import Integrations from "./pages/integrations/Integrations";
+import Settings, { canOpenSettings } from "./pages/settings/Settings";
 
 // Everything a tenant page needs: who is signed in, which tenant, its API,
 // and the scope filter: "" (everything visible), "entity:<slug>" or "bu:<slug>".
@@ -71,11 +70,11 @@ export default function App() {
     case "stacks": body = id === "new" ? <StackNew ctx={ctx} /> : id ? <StackDetail ctx={ctx} id={id} /> : <Stacks ctx={ctx} />; break;
     case "runs": body = id ? <RunDetail ctx={ctx} id={id} /> : <Runs ctx={ctx} />; break;
     case "catalog": body = <CatalogPage ctx={ctx} />; break;
-    case "environments": body = <Environments ctx={ctx} />; break;
+    case "environments": body = <Settings ctx={ctx} section="organisation" />; break; // old link
     case "connections": body = <Integrations ctx={ctx} route={["cloud"]} />; break; // old link
     case "policies": body = <Policies ctx={ctx} />; break;
     case "audit": body = <Audit ctx={ctx} />; break;
-    case "settings": body = <TenantAdmin ctx={ctx} />; break;
+    case "settings": body = <Settings ctx={ctx} section={id} />; break;
     case "assistant": body = <Assistant ctx={ctx} />; break;
     case "integrations": body = <Integrations ctx={ctx} route={route.slice(3)} />; break;
     default: body = <Stacks ctx={ctx} />;
@@ -83,8 +82,8 @@ export default function App() {
 
   const nav: [string, string, boolean][] = t ? [
     ["stacks", "Stacks", true], ["runs", "Runs", true], ["catalog", "Module catalog", true],
-    ["environments", "Environments", true], ["integrations", "Integrations", true], ["policies", "Policies", true], ["audit", "Audit log", true], ["assistant", "Assistant", true],
-    ["settings", "Tenant settings", has(t, "tenant_admin")],
+    ["integrations", "Integrations", true], ["policies", "Policies", true], ["audit", "Audit log", true], ["assistant", "Assistant", true],
+    ["settings", "Tenant settings", !!ctx && canOpenSettings(ctx)],
   ] : [];
 
   return (
@@ -100,7 +99,7 @@ export default function App() {
             </select>
             {t && (
               <>
-                <label htmlFor="scope-pick">Entity / business unit</label>
+                <label htmlFor="scope-pick">Product / business unit</label>
                 <select id="scope-pick" value={scope} onChange={e => setScope(e.target.value)}>
                   <option value="">All I can see</option>
                   {t.entities.map(e => (

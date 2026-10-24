@@ -11,11 +11,10 @@ The console talks only to the central plane. Infrastructure pages go through the
 | Stack | Plan changes or a destroy, edit the spec, see runs and encrypted state versions |
 | Run | Risk level and reasons, the approval chain (manager, FinOps, Security) with only the steps you may sign, live logs, plan, policy, discard |
 | Module catalog | Approved modules grouped by provider, versions, inputs and enforced baselines |
-| Environments | Each BU's environments: cloud connection, tier (prod raises risk), runner pool and guardrails |
-| Cloud connections | The tenant's AWS accounts, GCP projects and Azure subscriptions, which entities may use them, and the OIDC issuer, audience and subject to trust |
+| Integrations | GitHub (tenant admins: app credentials, connection test, paged webhook deliveries) and Cloud (AWS / GCP / Azure connections filtered by provider, paged on the server, trust details on demand). Each tab is loaded on first use |
 | Audit log | The tenant's hash-chained log, filtered to what your roles may see; chain verification for tenant-wide roles |
 | Assistant | Ask about modules, policies, approvals and your stacks. Answers cite their sources. A drafted stack opens in the stack editor for review; the assistant never creates or applies anything. If the tenant plane has it switched off, the page says how to enable it |
-| Tenant settings | (tenant admins) Backend health over mTLS, the entity → BU tree, people and roles at tenant, entity or BU scope, first tokens, risk policy, runners |
+| Tenant settings | One section at a time, each loaded on demand. **Organisation:** products (entities), then business units, then allowed environments, with the labels and contracts folder of each environment. **People & roles:** searchable and paged, with a grant form. **Contracts repository**, **Risk policy** and **Runners** follow. BU admins see Organisation for their units only |
 | Platform | (platform admins) Onboard tenants and check their backends |
 | My tokens | Create and revoke your own API tokens |
 
