@@ -1,19 +1,24 @@
-import { useEffect, useState } from "react";
-import { central, session, tenant as tenantApi, type Me, type MeTenant } from "./api";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { central, has, session, tenant as tenantApi, type Me, type MeTenant } from "./api";
 import { ErrorBox, Link, go, useRoute } from "./ui";
-import Stacks from "./pages/Stacks";
-import StackNew from "./pages/StackNew";
-import StackDetail from "./pages/StackDetail";
-import Runs from "./pages/Runs";
-import RunDetail from "./pages/RunDetail";
-import CatalogPage from "./pages/Catalog";
-import Audit from "./pages/Audit";
-import Platform from "./pages/Platform";
-import Account from "./pages/Account";
-import Policies from "./pages/Policies";
-import Assistant from "./pages/Assistant";
-import Integrations from "./pages/integrations/Integrations";
-import Settings, { canOpenSettings } from "./pages/settings/Settings";
+// Each page is its own chunk, downloaded the first time it is opened.
+const Stacks = lazy(() => import("./pages/Stacks"));
+const StackNew = lazy(() => import("./pages/StackNew"));
+const StackDetail = lazy(() => import("./pages/StackDetail"));
+const Runs = lazy(() => import("./pages/Runs"));
+const RunDetail = lazy(() => import("./pages/RunDetail"));
+const CatalogPage = lazy(() => import("./pages/Catalog"));
+const Audit = lazy(() => import("./pages/Audit"));
+const Platform = lazy(() => import("./pages/Platform"));
+const Account = lazy(() => import("./pages/Account"));
+const Policies = lazy(() => import("./pages/Policies"));
+const Assistant = lazy(() => import("./pages/Assistant"));
+const Integrations = lazy(() => import("./pages/integrations/Integrations"));
+const Settings = lazy(() => import("./pages/settings/Settings"));
+
+// Tenant admins see every settings section; entity (product) admins see
+// Organisation, where they manage their products' shared environments.
+const canOpenSettings = (ctx: Ctx) => has(ctx.t, "tenant_admin") || ctx.t.entities.some(e => e.roles.includes("admin"));
 
 // Everything a tenant page needs: who is signed in, which tenant, its API,
 // and the scope filter: "" (everything visible), "entity:<slug>" or "bu:<slug>".
@@ -125,7 +130,7 @@ export default function App() {
           <button className="ghost small" style={{ marginTop: 8 }} onClick={() => { central.logout().catch(() => {}).finally(() => { session.clear(); setMe(null); }); }}>Sign out</button>
         </div>
       </nav>
-      <main>{body}</main>
+      <main><Suspense fallback={<p className="muted">Loading…</p>}>{body}</Suspense></main>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { inScope, type Ctx } from "../App";
-import { canChange, type CatalogInput, type CatalogModule, type StackSpec } from "../api";
+import { allBUs, canChange, type CatalogInput, type CatalogModule, type StackSpec } from "../api";
 import { ErrorBox, Loading, go, useLoad } from "../ui";
 
 // Raw form values per module instance; converted to typed inputs on submit.
@@ -31,7 +31,7 @@ function convert(inp: CatalogInput, f: Field): { set: boolean; value?: unknown; 
 
 // A draft handed over by the assistant (validated there, but reviewed and submitted here).
 export const DRAFT_KEY = "pravaha.draft";
-type Draft = { tenant: string; name: string; environment: string; spec: StackSpec };
+type Draft = { tenant: string; name: string; bu: string; environment: string; spec: StackSpec };
 
 function fieldFrom(inp: CatalogInput, v: unknown): Field {
   const f = blank(inp);
@@ -46,7 +46,11 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
   const api = ctx.api;
   const catalog = useLoad(api.catalog, [ctx.t.slug]);
   const envs = useLoad(api.environments, [ctx.t.slug]);
-  const writable = (envs.data ?? []).filter(e => canChange(ctx.t, e.bu) && inScope(ctx, e.bu, e.entity));
+  // The stack belongs to a business unit; it deploys to an environment of that BU's product.
+  const units = allBUs(ctx.t).filter(b => canChange(ctx.t, b.slug) && inScope(ctx, b.slug, b.entity));
+  const [bu, setBu] = useState("");
+  const unit = units.find(b => b.slug === bu) ?? (units.length === 1 ? units[0] : undefined);
+  const writable = (envs.data ?? []).filter(e => unit && e.entity === unit.entity);
   const [name, setName] = useState("");
   const [env, setEnv] = useState("");
   const [instances, setInstances] = useState<Instance[]>([]);
@@ -73,12 +77,12 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
         outputs: (d.spec.outputs ?? []).filter(o => o.module === ref.name).map(o => o.output),
       });
     }
-    setName(d.name); setEnv(d.environment); setInstances(insts); setSeq(k);
+    setName(d.name); setBu(d.bu); setEnv(d.environment); setInstances(insts); setSeq(k);
     setImports((d.spec.imports ?? []).map(i => `${i.to} = ${i.id}`).join("\n"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalog.data, envs.data]);
 
-  const environment = envs.data?.find(e => e.name === env);
+  const environment = writable.find(e => e.name === env);
   const cloud = environment?.cloud.provider ?? "";
   const mods = useMemo(() => new Map((catalog.data?.modules ?? []).map(m => [m.id, m])), [catalog.data]);
   const available = (catalog.data?.modules ?? []).filter(m => !m.cloud || m.cloud === cloud);
@@ -121,27 +125,32 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
     setError(null);
     const spec = build();
     if (!spec) return;
-    try { setPreview(await api.preview({ name: name || "preview", environment: env, spec })); } catch (e) { setError(e); }
+    try { setPreview(await api.preview({ name: name || "preview", bu: unit?.slug ?? "", environment: env, spec })); } catch (e) { setError(e); }
   };
   const create = async () => {
     setError(null);
     const spec = build();
     if (!spec) return;
-    try { const s = await api.createStack({ name, environment: env, spec }); go(`t/${ctx.t.slug}/stacks/${s.id}`); } catch (e) { setError(e); }
+    try { const s = await api.createStack({ name, bu: unit?.slug ?? "", environment: env, spec }); go(`t/${ctx.t.slug}/stacks/${s.id}`); } catch (e) { setError(e); }
   };
 
   const refOptions = (self: string) => instances.filter(i => i.name !== self).flatMap(i => mods.get(i.module)!.outputs.map(o => `${i.name}.${o}`));
 
   return (
     <>
-      <div className="head"><div><h1>New stack</h1><div className="muted">Compose approved public modules. The stack belongs to its environment’s business unit; versions are pinned and security baselines are applied automatically.</div></div></div>
+      <div className="head"><div><h1>New stack</h1><div className="muted">Compose approved public modules. The stack belongs to a business unit and deploys to one of its product’s environments; versions are pinned and security baselines are applied automatically.</div></div></div>
       <div className="panel">
         <div className="grid">
           <div><label htmlFor="sn">Stack name</label><input id="sn" value={name} onChange={e => setName(e.target.value)} placeholder="payments-network" pattern="[a-z][a-z0-9-]{1,62}" /></div>
-          <div><label htmlFor="se">Environment</label>
-            <select id="se" value={env} onChange={e => { setEnv(e.target.value); setInstances([]); setPreview(null); }}>
+          <div><label htmlFor="sb">Business unit</label>
+            <select id="sb" value={unit?.slug ?? ""} onChange={e => { setBu(e.target.value); setEnv(""); setInstances([]); setPreview(null); }}>
+              {units.length !== 1 && <option value="">Choose…</option>}
+              {units.map(b => <option key={b.slug} value={b.slug}>{b.entityName} / {b.name}</option>)}
+            </select></div>
+          <div><label htmlFor="se">Environment <span className="muted">— shared by {unit ? unit.entityName : "the product"}’s business units</span></label>
+            <select id="se" value={env} disabled={!unit} onChange={e => { setEnv(e.target.value); setInstances([]); setPreview(null); }}>
               <option value="">Choose…</option>
-              {writable.map(e => <option key={e.id} value={e.name}>{e.entity} / {e.bu} / {e.name} ({e.connection || "no cloud"}, {e.tier})</option>)}
+              {writable.map(e => <option key={e.id} value={e.name}>{e.name} ({e.connection || "no cloud"}, {e.tier})</option>)}
             </select></div>
         </div>
       </div>

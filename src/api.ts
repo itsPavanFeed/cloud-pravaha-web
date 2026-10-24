@@ -26,7 +26,7 @@ export interface Catalog { registry: string; modules: CatalogModule[]; providers
 
 export interface Connection { id: string; name: string; cloud: { provider: string; auth?: string; [k: string]: unknown }; entities: string[]; created_by: string; created_at: string }
 export interface Environment {
-  id: string; name: string; bu: string; entity: string; tier: "prod" | "nonprod"; connection?: string; connection_id?: string;
+  id: string; name: string; entity: string; tier: "prod" | "nonprod"; connection?: string; connection_id?: string; // shared by the entity's business units
   cloud: { provider: string; auth?: string; [k: string]: unknown };
   runner_pool: string; max_destroys: number; allow_destroy: boolean; created_by: string; created_at: string;
 }
@@ -73,7 +73,7 @@ export interface AssistantTurn { role: "user" | "assistant"; text: string }
 export interface AssistantSource { id: string; kind: string; title: string }
 export interface AssistantAnswer {
   text: string; sources: AssistantSource[]; declined?: boolean;
-  draft?: { name: string; environment: string; spec: StackSpec };
+  draft?: { name: string; bu: string; environment: string; spec: StackSpec };
   usage: { input_tokens: number; output_tokens: number; cache_read_tokens: number; model_calls: number };
 }
 
@@ -154,9 +154,9 @@ export const tenant = (t: string) => {
     deleteEnvironment: (id: string) => call<void>("DELETE", p(`/environments/${id}`)),
     stacks: () => call<Stack[]>("GET", p("/stacks")),
     stack: (id: string) => call<Stack>("GET", p(`/stacks/${id}`)),
-    createStack: (s: { name: string; environment: string; spec: StackSpec }) => call<Stack>("POST", p("/stacks"), s),
+    createStack: (s: { name: string; bu: string; environment: string; spec: StackSpec }) => call<Stack>("POST", p("/stacks"), s),
     updateStack: (id: string, spec: StackSpec) => call<Stack>("PUT", p(`/stacks/${id}`), { spec }),
-    preview: (s: { name: string; environment: string; spec: StackSpec }) =>
+    preview: (s: { name: string; bu: string; environment: string; spec: StackSpec }) =>
       call<{ valid: boolean; problems?: string[]; files?: Record<string, string>; providers?: string[]; hash?: string }>("POST", p("/stacks/preview"), s),
     stackRuns: (id: string) => call<Run[]>("GET", p(`/stacks/${id}/runs`)),
     stateVersions: (id: string) => call<StateVersion[]>("GET", p(`/stacks/${id}/state-versions`)),

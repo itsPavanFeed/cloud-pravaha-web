@@ -1,6 +1,6 @@
 import { Suspense, lazy, useState } from "react";
 import type { Ctx } from "../../App";
-import { allBUs, buRoles, central, has } from "../../api";
+import { central, has } from "../../api";
 import { Copy, Loading, go, useLoad } from "../../ui";
 
 // One section at a time, each its own chunk.
@@ -21,9 +21,6 @@ const sections: { id: Section; title: string; hint: string; admin: boolean }[] =
   { id: "risk", title: "Risk policy", hint: "Approvals per risk level", admin: true },
   { id: "runners", title: "Runners", hint: "Where OpenTofu runs", admin: true },
 ];
-
-// Tenant admins see every section; BU admins see Organisation for their BUs.
-export const canOpenSettings = (ctx: Ctx) => has(ctx.t, "tenant_admin") || allBUs(ctx.t).some(b => buRoles(ctx.t, b.slug).includes("admin"));
 
 export default function Settings({ ctx, section }: { ctx: Ctx; section?: string }) {
   const admin = has(ctx.t, "tenant_admin");
