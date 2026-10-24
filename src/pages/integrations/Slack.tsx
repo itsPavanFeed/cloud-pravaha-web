@@ -18,11 +18,33 @@ export default function SlackIntegration({ ctx }: { ctx: Ctx }) {
   const run = async (fn: () => Promise<unknown>, ok?: string) => { setError(null); setMsg(""); try { await fn(); if (ok) setMsg(ok); } catch (e) { setError(e); } };
   if (!hook.data || !appCfg.data) return hook.error || appCfg.error ? <ErrorBox error={hook.error || appCfg.error} /> : <Loading />;
   const h = hook.data, a = appCfg.data;
+  // A Slack app manifest: Slack's "create app" page opens with everything filled in.
+  const manifest = {
+    display_information: { name: "Cloud Pravaha", description: "Infrastructure approvals and alerts", background_color: "#0f766e" },
+    features: { bot_user: { display_name: "Cloud Pravaha", always_online: false } },
+    oauth_config: { scopes: { bot: ["incoming-webhook", "users:read", "users:read.email"] } },
+    settings: { interactivity: { is_enabled: true, request_url: a.interactivity_url }, org_deploy_enabled: false, socket_mode_enabled: false, token_rotation_enabled: false },
+  };
+  const createURL = "https://api.slack.com/apps?new_app=1&manifest_json=" + encodeURIComponent(JSON.stringify(manifest));
+  const reachable = !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(a.interactivity_url);
 
   return (
     <>
       <ErrorBox error={error} />
       {msg && <div className="notice">{msg}</div>}
+      <div className="panel">
+        <h2>Connect Slack in three steps</h2>
+        <ol className="steps-list">
+          <li>
+            <a className="button-link" href={createURL} target="_blank" rel="noreferrer noopener">Create the Slack app</a>
+            <span className="muted small"> — opens Slack with the app pre-filled (bot, scopes, interactivity Request URL). Choose your workspace and click Create.</span>
+            {!reachable && <div className="small del">The Request URL is a local address; set PRAVAHA_WEBHOOK_BASE_URL (e.g. your ngrok URL) first so Slack can reach it.</div>}
+          </li>
+          <li><strong>Install to Workspace</strong> (left menu: Install App) and pick the channel for alerts.</li>
+          <li>Paste below: the <strong>webhook URL</strong> (Incoming Webhooks page), the <strong>Bot User OAuth Token</strong> (OAuth &amp; Permissions) and the <strong>Signing Secret</strong> (Basic Information).</li>
+        </ol>
+      </div>
+
       <div className="panel">
         <div className="drill-head">
           <div><h2>Slack alerts</h2><div className="muted small">Every notification (plans waiting for approval, applies, failures, drift, pull requests) is also posted to a Slack channel.</div></div>
