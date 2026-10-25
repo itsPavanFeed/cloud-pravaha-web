@@ -75,7 +75,7 @@ export default function App() {
   else switch (page) {
     case "stacks": body = id === "new" ? <StackNew ctx={ctx} /> : id ? <StackDetail ctx={ctx} id={id} /> : <Stacks ctx={ctx} />; break;
     case "runs": body = id ? <RunDetail ctx={ctx} id={id} /> : <Runs ctx={ctx} />; break;
-    case "catalog": body = <CatalogPage ctx={ctx} />; break;
+    case "catalog": body = <CatalogPage ctx={ctx} route={route.slice(3)} />; break;
     case "environments": body = <Settings ctx={ctx} section="organisation" />; break; // old link
     case "connections": body = <Integrations ctx={ctx} route={["cloud"]} />; break; // old link
     case "policies": body = <Policies ctx={ctx} />; break;

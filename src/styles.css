@@ -207,3 +207,9 @@ ul.checks { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 
 ul.checks ul { margin: 4px 0 0 18px; padding: 0; }
 button.link { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 500; cursor: pointer; }
 button.link:hover { text-decoration: underline; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: var(--idle-soft); }
+.tabs.compact .tab { min-width: 0; flex: 1 1 140px; max-width: 220px; padding: 10px 14px; }
+.kind-foot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; align-items: start; }
+.kind-foot .panel { margin: 0; }
+@media (max-width: 900px) { .kind-foot { grid-template-columns: 1fr; } }
