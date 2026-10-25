@@ -17,14 +17,14 @@ export default function Contracts({ ctx }: SectionProps) {
   const editing = cc !== null || !saved;
   const v = cc ?? saved ?? blank;
   const st = contracts.data.status;
-  const example = (v.layout ?? "flat") === "nested" ? `${v.path || "."}/retail/prod/payments/api.json` : `${v.path || "."}/api.json  (with "bu": "payments", "environment": "prod")`;
+  const example = (v.layout ?? "flat") === "nested" ? `${v.path || "."}/retail/prod/payments/api/bucket.yaml` : `${v.path || "."}/api/bucket.yaml  (metadata names environment: prod, bu: payments)`;
 
   return (
     <>
       <ErrorBox error={error} />
       <div className="panel">
         <div className="drill-head">
-          <div><h2>Contracts repository</h2><div className="muted small">One JSON file per stack. The tenant plane pulls the branch, creates or updates Git-managed stacks and queues plans; approvals still apply.</div></div>
+          <div><h2>Contracts repository</h2><div className="muted small">YAML, one resource per file; each folder is a stack. Files hold only what differs from the defaults and reference secrets (secretRef) instead of holding them. The tenant plane pulls the branch, creates or updates Git-managed stacks and queues plans; approvals still apply.</div></div>
           {saved && !editing && <div className="row">
             <button className="ghost" onClick={() => run(async () => { await ctx.api.syncContracts(); contracts.reload(); })}>Sync now</button>
             <button onClick={() => setCc(saved)}>Edit</button></div>}
@@ -32,7 +32,7 @@ export default function Contracts({ ctx }: SectionProps) {
         {!editing && saved ? (
           <dl className="kv">
             <dt>Repository</dt><dd className="mono">{saved.provider}: {saved.repo} @ {saved.branch}</dd>
-            <dt>Folder layout</dt><dd className="mono">{saved.layout === "nested" ? `${saved.path}/<product>/<environment>/<business unit>/<stack>.json` : `${saved.path}/<stack>.json`}</dd>
+            <dt>Folder layout</dt><dd className="mono">{saved.layout === "nested" ? `${saved.path}/<product>/<environment>/<business unit>/<stack>/<resource>.yaml` : `${saved.path}/<stack>/<resource>.yaml`}</dd>
             <dt>Authentication</dt><dd>{saved.auth === "github_app" ? "GitHub App" : contracts.data.token_set ? "access token (stored)" : <span className="del">no token</span>}</dd>
             <dt>Automation</dt><dd>{saved.enabled ? `polls every ${saved.poll_seconds}s` : "polling off (webhook or manual sync)"} · {saved.auto_plan ? "plans changes" : "no automatic plans"} · {saved.auto_apply_low_risk ? "auto-applies low risk" : "every apply approved"}</dd>
           </dl>
@@ -44,7 +44,7 @@ export default function Contracts({ ctx }: SectionProps) {
               <div><label>Branch</label><input value={v.branch} onChange={e => setCc({ ...v, branch: e.target.value })} /></div>
               <div><label>Folder</label><input value={v.path} onChange={e => setCc({ ...v, path: e.target.value })} /></div>
               <div><label>Layout</label><select value={v.layout ?? "flat"} onChange={e => setCc({ ...v, layout: e.target.value as ContractsConfig["layout"] })}>
-                <option value="nested">product / environment / business unit folders</option><option value="flat">flat (environment inside each file)</option></select></div>
+                <option value="nested">product / environment / business unit / stack folders</option><option value="flat">stack folders (environment and BU in metadata)</option></select></div>
               {v.provider === "github" && <div><label>Authentication</label><select value={v.auth ?? "token"} onChange={e => setCc({ ...v, auth: e.target.value as ContractsConfig["auth"] })}>
                 <option value="token">Access token</option><option value="github_app">GitHub App (Integrations)</option></select></div>}
               <div><label>API URL <span className="muted">(GitHub Enterprise / self-hosted GitLab)</span></label><input value={v.api_url ?? ""} onChange={e => setCc({ ...v, api_url: e.target.value || undefined })} /></div>

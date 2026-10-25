@@ -15,7 +15,7 @@ export default function Stacks({ ctx }: { ctx: Ctx }) {
   const base = `t/${ctx.t.slug}/`;
   const all = (data ?? []).filter(s => inScope(ctx, s.bu, s.entity));
   const rows = all.filter(s => {
-    if (q && !`${s.name} ${s.bu} ${s.entity} ${s.environment} ${s.spec.modules.map(m => m.module).join(" ")}`.toLowerCase().includes(q.toLowerCase())) return false;
+    if (q && !`${s.name} ${s.bu} ${s.entity} ${s.environment} ${s.spec.modules.map(m => `${m.kind ?? ""} ${m.module ?? ""}`).join(" ")}`.toLowerCase().includes(q.toLowerCase())) return false;
     const st = s.last_run?.status;
     if (state === "active") return !!st && waiting.has(st);
     if (state === "attention") return !!st && failed.has(st);
@@ -37,7 +37,7 @@ export default function Stacks({ ctx }: { ctx: Ctx }) {
       ) : (
         <>
           <div className="toolbar">
-            <input type="search" placeholder="Search name, business unit, environment or module" value={q} onChange={e => { setQ(e.target.value); setOffset(0); }} />
+            <input type="search" placeholder="Search name, business unit, environment or kind" value={q} onChange={e => { setQ(e.target.value); setOffset(0); }} />
             <div className="chips" role="tablist" aria-label="Filter">
               {([["", "All"], ["active", "In progress"], ["attention", "Needs attention"], ["never", "Never run"]] as const).map(([k, label]) => (
                 <button key={k || "all"} role="tab" aria-selected={state === k} className={state === k ? "chip on" : "chip"} onClick={() => filter(k)}>{label}</button>
@@ -47,7 +47,7 @@ export default function Stacks({ ctx }: { ctx: Ctx }) {
           {rows.length === 0 ? <Empty>No stacks match.</Empty> : (
             <div className="panel" style={{ padding: 0 }}>
               <table className="stacks-table">
-                <thead><tr><th>Stack</th><th>Product / business unit</th><th>Environment</th><th>Modules</th><th>Last run</th><th>Updated</th></tr></thead>
+                <thead><tr><th>Stack</th><th>Product / business unit</th><th>Environment</th><th>Resources</th><th>Last run</th><th>Updated</th></tr></thead>
                 <tbody>{page.map(s => (
                   <tr key={s.id}>
                     <td className="nowrap"><Link to={`${base}stacks/${s.id}`}>{s.name}</Link>
@@ -55,7 +55,7 @@ export default function Stacks({ ctx }: { ctx: Ctx }) {
                       {s.pr_number && <span className="badge busy">proposed in #{s.pr_number}</span>}</td>
                     <td className="nowrap"><span className="muted">{s.entity} /</span> {s.bu}</td>
                     <td className="nowrap">{s.environment}</td>
-                    <td>{s.spec.modules.map(m => <span key={m.name} className="tag">{m.module}</span>)}</td>
+                    <td>{s.spec.modules.map(m => <span key={m.name} className="tag" title={m.module}>{m.kind ?? m.module}</span>)}</td>
                     <td className="nowrap">{s.last_run ? <Link to={`${base}runs/${s.last_run.id}`}><Status s={s.last_run.status} /></Link> : <span className="muted">never</span>}</td>
                     <td className="nowrap"><Time iso={s.updated_at} /></td>
                   </tr>))}

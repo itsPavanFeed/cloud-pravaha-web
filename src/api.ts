@@ -14,15 +14,36 @@ export interface User { id: string; email: string; name: string; platform_admin:
 export interface Me { user: User; tenants: MeTenant[] }
 
 export interface CatalogInput {
-  name: string; type: string; required?: boolean; description?: string; default?: unknown;
+  name: string; type: string; required?: boolean; sensitive?: boolean; description?: string; default?: unknown;
   pattern?: string; item_pattern?: string; allowed?: unknown[]; min?: number; max?: number; max_items?: number;
 }
 export interface CatalogModule {
-  id: string; title: string; description: string; source: string; versions: string[]; cloud: string;
+  id: string; kind: string; title: string; description: string; source: string; versions: string[]; cloud: string;
   providers: string[]; inputs: CatalogInput[]; enforced?: Record<string, unknown>; outputs: string[];
   dependencies?: { source: string; versions: string[] }[];
 }
-export interface Catalog { registry: string; modules: CatalogModule[]; providers: { source: string; version: string; cloud: string }[]; tofu_version: string }
+// A tenant's defaults for one kind (from the deployed module release).
+export interface KindDefaults { target: string; version?: string; spec?: Record<string, unknown>; tiers?: Record<string, Record<string, unknown>>; file?: string }
+export interface Catalog {
+  registry: string; modules: CatalogModule[]; providers: { source: string; version: string; cloud: string }[]; tofu_version: string;
+  defaults?: Record<string, KindDefaults>; release?: { id: string; number: number; sha256: string };
+}
+
+export interface ReleaseCheck { name: string; ok: boolean; detail?: string; errors?: string[] }
+export interface ReleaseManifest {
+  kind: "modules" | "policies"; revision: string; tenant: string; built_at: string;
+  catalog?: { modules: CatalogModule[]; providers: { source: string; version: string }[] };
+  defaults?: { tenant: string; kinds: Record<string, KindDefaults> };
+  packages?: Record<string, { dir: string; origin: string; sha256: string; files: number; bytes: number; deps?: string[] }>;
+  policies?: { name: string; scope: string; level: string; description?: string; file: string; tests: number }[];
+}
+export interface Release {
+  id: string; kind: "modules" | "policies"; number: number; revision: string; status: "building" | "failed" | "ready" | "active" | "superseded";
+  checks: ReleaseCheck[]; manifest?: ReleaseManifest; sha256?: string; size?: number; error?: string;
+  created_by: string; created_at: string; finished_at?: string; deployed_by?: string; deployed_at?: string;
+}
+export interface ReleaseSource { provider: "github" | "gitlab" | "local"; repo: string; branch: string; path: string; api_url?: string; auth?: "token" | "github_app"; poll_seconds: number; enabled: boolean; auto_deploy: boolean }
+export interface SecretStore { address: string; auth_mount?: string; role: string; namespace?: string; audience?: string }
 
 export interface Connection { id: string; name: string; cloud: { provider: string; auth?: string; [k: string]: unknown }; entities: string[]; created_by: string; created_at: string }
 export interface Environment {
@@ -31,7 +52,7 @@ export interface Environment {
   runner_pool: string; max_destroys: number; max_creates: number; max_imports: number; allow_destroy: boolean; created_by: string; created_at: string;
 }
 
-export interface ModuleRef { name: string; module: string; version?: string; inputs?: Record<string, unknown> }
+export interface ModuleRef { name: string; kind?: string; module?: string; version?: string; inputs?: Record<string, unknown> }
 export interface StackSpec { modules: ModuleRef[]; outputs?: { name: string; module: string; output: string; sensitive?: boolean }[]; imports?: { to: string; id: string }[] }
 export interface RunBrief { id: string; status: string; operation: string; created_at: string }
 export interface Stack {
@@ -242,6 +263,18 @@ export const tenant = (t: string) => {
       call<{ items: WebhookDelivery[]; next_before?: number }>("GET", p(`/integrations/github/deliveries?limit=${limit}${before ? `&before=${before}` : ""}`)),
     connectionsPage: (provider: "" | "aws" | "gcp" | "azure", limit: number, offset: number) =>
       call<{ items: Connection[]; total: number; counts: Record<string, number> }>("GET", p(`/connections?limit=${limit}&offset=${offset}${provider ? `&provider=${provider}` : ""}`)),
+    releases: (kind: "modules" | "policies") => call<{ releases: Release[]; bundled?: { kinds: number; defaults: number } }>("GET", p(`/releases/${kind}`)),
+    release: (kind: "modules" | "policies", id: string) => call<Release>("GET", p(`/releases/${kind}/${id}`)),
+    releaseSource: (kind: "modules" | "policies") => call<{ config: ReleaseSource | null; token_set: boolean }>("GET", p(`/releases/${kind}/source`)),
+    putReleaseSource: (kind: "modules" | "policies", c: ReleaseSource) => call<ReleaseSource>("PUT", p(`/releases/${kind}/source`), c),
+    putReleaseToken: (kind: "modules" | "policies", token: string) => call<void>("PUT", p(`/releases/${kind}/source/token`), { token }),
+    buildRelease: (kind: "modules" | "policies") => call<Release>("POST", p(`/releases/${kind}/builds`)),
+    deployRelease: (kind: "modules" | "policies", id: string) => call<Release>("POST", p(`/releases/${kind}/${id}/deploy`)),
+    bundleCache: () => call<Record<string, number>>("GET", p("/releases/cache")),
+    secretStore: () => call<{ configured: boolean; config?: SecretStore; audience?: string; issuer: string; jwks_url: string }>("GET", p("/integrations/secret-store")),
+    putSecretStore: (v: SecretStore) => call<SecretStore>("PUT", p("/integrations/secret-store"), v),
+    deleteSecretStore: () => call<void>("DELETE", p("/integrations/secret-store")),
+    testSecretStore: () => call<{ ok: boolean; status?: number; version?: string; error?: string }>("POST", p("/integrations/secret-store/test")),
     runners: () => call<Runner[]>("GET", p("/runners")),
     createRunner: (r: { name: string; pool: string }) => call<{ runner: Runner; secret: string }>("POST", p("/runners"), r),
     revokeRunner: (id: string) => call<void>("DELETE", p(`/runners/${id}`)),

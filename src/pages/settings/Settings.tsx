@@ -9,20 +9,22 @@ const People = lazyPage(() => import("./People"));
 const Contracts = lazyPage(() => import("./Contracts"));
 const Risk = lazyPage(() => import("./Risk"));
 const Runners = lazyPage(() => import("./Runners"));
+const Releases = lazyPage(() => import("./Releases"));
 
 export type Secret = { label: string; value: string } | null;
 export type SectionProps = { ctx: Ctx; showSecret: (s: Secret) => void };
 
-type Section = "organisation" | "people" | "contracts" | "risk" | "runners";
+type Section = "organisation" | "people" | "contracts" | "releases" | "risk" | "runners";
 const sections: { id: Section; title: string; hint: string; admin: boolean }[] = [
   { id: "organisation", title: "Organisation", hint: "Products, business units, environments", admin: false },
   { id: "people", title: "People & roles", hint: "Who can do what, where", admin: true },
   { id: "contracts", title: "Contracts repository", hint: "Stacks from Git", admin: true },
+  { id: "releases", title: "Releases", hint: "Modules, defaults, policies", admin: true },
   { id: "risk", title: "Risk policy", hint: "Approvals per risk level", admin: true },
   { id: "runners", title: "Runners", hint: "Where OpenTofu runs", admin: true },
 ];
 
-export default function Settings({ ctx, section }: { ctx: Ctx; section?: string }) {
+export default function Settings({ ctx, section, route }: { ctx: Ctx; section?: string; route?: string[] }) {
   const admin = has(ctx.t, "tenant_admin");
   const visible = sections.filter(s => admin || !s.admin);
   const current = visible.find(s => s.id === section) ?? visible[0];
@@ -56,6 +58,7 @@ export default function Settings({ ctx, section }: { ctx: Ctx; section?: string 
         {current.id === "contracts" && <Contracts {...props} />}
         {current.id === "risk" && <Risk {...props} />}
         {current.id === "runners" && <Runners {...props} />}
+        {current.id === "releases" && <Releases {...props} route={route} />}
       </Suspense>
     </>
   );

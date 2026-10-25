@@ -80,14 +80,14 @@ export default function App() {
     case "connections": body = <Integrations ctx={ctx} route={["cloud"]} />; break; // old link
     case "policies": body = <Policies ctx={ctx} />; break;
     case "audit": body = <Audit ctx={ctx} />; break;
-    case "settings": body = <Settings ctx={ctx} section={id} />; break;
+    case "settings": body = <Settings ctx={ctx} section={id} route={route.slice(4)} />; break;
     case "assistant": body = <Assistant ctx={ctx} />; break;
     case "integrations": body = <Integrations ctx={ctx} route={route.slice(3)} />; break;
     default: body = <Stacks ctx={ctx} />;
   }
 
   const nav: [string, string, boolean][] = t ? [
-    ["stacks", "Stacks", true], ["runs", "Runs", true], ["catalog", "Module catalog", true],
+    ["stacks", "Stacks", true], ["runs", "Runs", true], ["catalog", "Kinds & defaults", true],
     ["integrations", "Integrations", true], ["policies", "Policies", true], ["audit", "Audit log", true], ["assistant", "Assistant", true],
     ["settings", "Tenant settings", !!ctx && canOpenSettings(ctx)],
   ] : [];

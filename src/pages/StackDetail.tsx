@@ -58,7 +58,7 @@ export default function StackDetail({ ctx, id }: { ctx: Ctx; id: string }) {
           <div className="grid" style={{ marginTop: 12 }}>
             {stack.spec.modules.map(m => (
               <div className="card" key={m.name}>
-                <h3>{m.name} <span className="tag">{m.module}@{m.version}</span></h3>
+                <h3>{m.name} <span className="tag">{m.kind ?? m.module}</span> <span className="tag" title={m.module}>v{m.version}</span></h3>
                 <pre className="code small">{JSON.stringify(m.inputs ?? {}, null, 2)}</pre>
               </div>
             ))}

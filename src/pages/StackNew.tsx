@@ -1,24 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
 import { inScope, type Ctx } from "../App";
-import { allBUs, canChange, type CatalogInput, type CatalogModule, type StackSpec } from "../api";
+import { allBUs, canChange, type CatalogInput, type CatalogModule, type KindDefaults, type StackSpec } from "../api";
 import { ErrorBox, Loading, go, useLoad } from "../ui";
 
-// Raw form values per module instance; converted to typed inputs on submit.
-type Field = { mode: "value" | "ref"; text: string; bool: boolean; ref: string };
+// Raw form values per resource; converted to typed inputs on submit. Fields
+// start empty: a stack keeps only what differs from the defaults (the kind's,
+// then the tenant's), so later changes to the defaults still apply to it.
+type Field = { mode: "value" | "ref" | "secret"; text: string; ref: string; secret: string };
 type Instance = { key: number; name: string; module: string; version: string; fields: Record<string, Field>; outputs: string[] };
 
-const blank = (inp: CatalogInput): Field => ({
-  mode: "value",
-  text: inp.default === undefined ? "" : typeof inp.default === "object" ? JSON.stringify(inp.default) : String(inp.default),
-  bool: inp.default === true,
-  ref: "",
-});
+const blank = (inp: CatalogInput): Field => ({ mode: inp.sensitive ? "secret" : "value", text: "", ref: "", secret: "" });
+
+const show = (v: unknown) => (typeof v === "object" ? JSON.stringify(v) : String(v));
+
+// effectiveDefault is what applies when a field is left empty, and where it comes from.
+function effectiveDefault(inp: CatalogInput, d: KindDefaults | undefined, tier: string): { value: unknown; from: string } | null {
+  const tierVal = d?.tiers?.[tier]?.[inp.name];
+  if (tierVal !== undefined) return { value: tierVal, from: `tenant default (${tier})` };
+  if (d?.spec?.[inp.name] !== undefined) return { value: d.spec[inp.name], from: "tenant default" };
+  if (inp.default !== undefined) return { value: inp.default, from: "kind default" };
+  return null;
+}
 
 function convert(inp: CatalogInput, f: Field): { set: boolean; value?: unknown; error?: string } {
   if (f.mode === "ref") return f.ref ? { set: true, value: { $ref: f.ref } } : { set: false };
+  if (f.mode === "secret") {
+    const s = f.secret.trim();
+    if (!s) return { set: false };
+    return /^vault:\/\/[^/]+\/.+#.+$/.test(s) ? { set: true, value: { $secret: s } } : { set: false, error: `${inp.name} must be a secret reference like vault://kv/app/db#password` };
+  }
   const t = f.text.trim();
   switch (inp.type) {
-    case "bool": return inp.default === f.bool ? { set: false } : { set: true, value: f.bool };
+    case "bool": return t === "" ? { set: false } : { set: true, value: t === "true" };
     case "number": return t === "" ? { set: false } : isNaN(Number(t)) ? { set: false, error: `${inp.name} must be a number` } : { set: true, value: Number(t) };
     case "list(string)": return t === "" ? { set: false } : { set: true, value: t.split(",").map(s => s.trim()).filter(Boolean) };
     case "list(number)": return t === "" ? { set: false } : { set: true, value: t.split(",").map(s => Number(s.trim())) };
@@ -37,7 +50,8 @@ function fieldFrom(inp: CatalogInput, v: unknown): Field {
   const f = blank(inp);
   if (v === undefined) return f;
   if (v && typeof v === "object" && "$ref" in (v as Record<string, unknown>)) return { ...f, mode: "ref", ref: String((v as Record<string, unknown>).$ref) };
-  if (inp.type === "bool") return { ...f, bool: v === true };
+  if (v && typeof v === "object" && "$secret" in (v as Record<string, unknown>)) return { ...f, mode: "secret", secret: String((v as Record<string, unknown>).$secret) };
+  if (inp.type === "bool") return { ...f, text: v === true ? "true" : "false" };
   if (Array.isArray(v) && inp.type.startsWith("list(")) return { ...f, text: v.join(", ") };
   return { ...f, text: typeof v === "object" ? JSON.stringify(v) : String(v) };
 }
@@ -69,14 +83,14 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
     let d: Draft | null = null;
     try { d = JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? "null"); sessionStorage.removeItem(DRAFT_KEY); } catch { d = null; }
     if (!d || d.tenant !== ctx.t.slug) return;
-    const byId = new Map(catalog.data.modules.map(m => [m.id, m]));
+    const byId = new Map(catalog.data.modules.flatMap(m => [[m.id, m], [m.kind, m]] as [string, CatalogModule][]));
     let k = seq;
     const insts: Instance[] = [];
     for (const ref of d.spec.modules ?? []) {
-      const m = byId.get(ref.module);
+      const m = byId.get(ref.module ?? ref.kind ?? "");
       if (!m) continue;
       insts.push({
-        key: k++, name: ref.name, module: m.id, version: ref.version || m.versions[m.versions.length - 1],
+        key: k++, name: ref.name, module: m.id, version: ref.version ?? "",
         fields: Object.fromEntries(m.inputs.map(inp => [inp.name, fieldFrom(inp, ref.inputs?.[inp.name])])),
         outputs: (d.spec.outputs ?? []).filter(o => o.module === ref.name).map(o => o.output),
       });
@@ -89,6 +103,7 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
   const environment = writable.find(e => e.name === env);
   const cloud = environment?.cloud.provider ?? "";
   const mods = useMemo(() => new Map((catalog.data?.modules ?? []).map(m => [m.id, m])), [catalog.data]);
+  const defaults = catalog.data?.defaults ?? {};
   const available = (catalog.data?.modules ?? []).filter(m => !m.cloud || m.cloud === cloud);
 
   if (!catalog.data || !envs.data) return catalog.error || envs.error ? <ErrorBox error={catalog.error || envs.error} /> : <Loading />;
@@ -97,7 +112,7 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
     const base = m.id.replace(/^(aws|gcp|azure)-/, "").replace(/-/g, "_").slice(0, 30);
     let n = base, i = 2;
     while (instances.some(x => x.name === n)) n = `${base}_${i++}`;
-    setInstances([...instances, { key: seq, name: n, module: m.id, version: m.versions[m.versions.length - 1], fields: Object.fromEntries(m.inputs.map(inp => [inp.name, blank(inp)])), outputs: [] }]);
+    setInstances([...instances, { key: seq, name: n, module: m.id, version: "", fields: Object.fromEntries(m.inputs.map(inp => [inp.name, blank(inp)])), outputs: [] }]);
     setSeq(seq + 1); setPreview(null);
   };
   const update = (key: number, fn: (i: Instance) => Instance) => { setInstances(instances.map(i => (i.key === key ? fn(i) : i))); setPreview(null); };
@@ -113,7 +128,7 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
         if (r.error) problems.push(`${inst.name}: ${r.error}`);
         if (r.set) inputs[inp.name] = r.value;
       }
-      spec.modules.push({ name: inst.name, module: inst.module, version: inst.version, inputs });
+      spec.modules.push({ name: inst.name, kind: m.kind, version: inst.version || undefined, inputs });
       for (const o of inst.outputs) spec.outputs!.push({ name: `${inst.name}_${o}`.replace(/-/g, "_").slice(0, 40), module: inst.name, output: o });
     }
     for (const line of imports.split("\n").map(l => l.trim()).filter(Boolean)) {
@@ -211,37 +226,52 @@ export default function StackNew({ ctx }: { ctx: Ctx }) {
         return (
           <div className="modbox panel" key={inst.key}>
             <div className="row" style={{ justifyContent: "space-between" }}>
-              <div><strong>{m.title}</strong> <span className="tag">{m.source}</span></div>
+              <div><strong>{m.title}</strong> <span className="tag">kind {m.kind}</span> <span className="tag">{m.source}</span></div>
               <button className="ghost small" onClick={() => setInstances(instances.filter(i => i.key !== inst.key))}>Remove</button>
             </div>
             <div className="grid">
               <div><label>Instance name</label><input value={inst.name} onChange={e => update(inst.key, i => ({ ...i, name: e.target.value }))} /></div>
-              <div><label>Version</label><select value={inst.version} onChange={e => update(inst.key, i => ({ ...i, version: e.target.value }))}>{m.versions.map(v => <option key={v}>{v}</option>)}</select></div>
+              <div><label>Version</label><select value={inst.version} onChange={e => update(inst.key, i => ({ ...i, version: e.target.value }))}>
+                <option value="">default ({defaults[m.kind]?.version ?? m.versions[m.versions.length - 1]})</option>
+                {m.versions.map(v => <option key={v}>{v}</option>)}</select></div>
             </div>
+            <p className="small muted" style={{ margin: "4px 0 8px" }}>Leave a field empty to use its default; only what you change is stored with the stack.</p>
             {m.inputs.map(inp => {
               const f = inst.fields[inp.name];
               const set = (p: Partial<Field>) => update(inst.key, i => ({ ...i, fields: { ...i.fields, [inp.name]: { ...f, ...p } } }));
               const refs = inp.type !== "bool" ? refOptions(inst.name) : [];
+              const def = effectiveDefault(inp, defaults[m.kind], environment?.tier ?? "nonprod");
+              const hint = def ? `${def.from}: ${show(def.value)}` : inp.type.startsWith("list") ? "comma, separated" : inp.pattern ?? "";
+              const canSecret = inp.type === "string";
               return (
                 <div key={inp.name}>
-                  <label>{inp.name}{inp.required && " *"} <span className="muted">{inp.type} — {inp.description}</span></label>
-                  {refs.length > 0 && (
+                  <label>{inp.name}{inp.required && !def && " *"} {inp.sensitive && <span className="badge wait">sensitive</span>} <span className="muted">{inp.type} — {inp.description}</span></label>
+                  {(refs.length > 0 || (canSecret && !inp.sensitive)) && (
                     <div className="row small" style={{ marginBottom: 4 }}>
                       <label className="row" style={{ margin: 0, fontWeight: 400 }}><input type="radio" checked={f.mode === "value"} onChange={() => set({ mode: "value" })} /> value</label>
-                      <label className="row" style={{ margin: 0, fontWeight: 400 }}><input type="radio" checked={f.mode === "ref"} onChange={() => set({ mode: "ref" })} /> output of another module</label>
+                      {refs.length > 0 && <label className="row" style={{ margin: 0, fontWeight: 400 }}><input type="radio" checked={f.mode === "ref"} onChange={() => set({ mode: "ref" })} /> output of another resource</label>}
+                      {canSecret && <label className="row" style={{ margin: 0, fontWeight: 400 }}><input type="radio" checked={f.mode === "secret"} onChange={() => set({ mode: "secret" })} /> secret from the vault</label>}
                     </div>
                   )}
                   {f.mode === "ref" ? (
                     <select value={f.ref} onChange={e => set({ ref: e.target.value })}><option value="">Choose…</option>{refs.map(r => <option key={r}>{r}</option>)}</select>
+                  ) : f.mode === "secret" ? (
+                    <>
+                      <input className="mono" value={f.secret} onChange={e => set({ secret: e.target.value })} placeholder="vault://kv/payments/orders-db#password" />
+                      <div className="small muted">The run reads it from the tenant's secret store at plan time. The value never reaches Git or the platform.</div>
+                    </>
                   ) : inp.type === "bool" ? (
-                    <input type="checkbox" checked={f.bool} onChange={e => set({ bool: e.target.checked })} />
+                    <select value={f.text} onChange={e => set({ text: e.target.value })}>
+                      <option value="">{def ? `default (${show(def.value)})` : "module default"}</option><option value="true">true</option><option value="false">false</option>
+                    </select>
                   ) : inp.allowed ? (
-                    <select value={f.text} onChange={e => set({ text: e.target.value })}><option value="">(module default)</option>{inp.allowed.map(a => <option key={String(a)}>{String(a)}</option>)}</select>
+                    <select value={f.text} onChange={e => set({ text: e.target.value })}><option value="">{def ? `default (${show(def.value)})` : "module default"}</option>{inp.allowed.map(a => <option key={String(a)}>{String(a)}</option>)}</select>
                   ) : inp.type === "json" || inp.type.startsWith("map") ? (
-                    <textarea value={f.text} onChange={e => set({ text: e.target.value })} placeholder={inp.type.startsWith("map") ? '{"team": "platform"}' : "JSON"} spellCheck={false} />
+                    <textarea value={f.text} onChange={e => set({ text: e.target.value })} placeholder={def ? hint : inp.type.startsWith("map") ? '{"team": "platform"}' : "JSON"} spellCheck={false} />
                   ) : (
-                    <input value={f.text} onChange={e => set({ text: e.target.value })} placeholder={inp.type.startsWith("list") ? "comma, separated" : inp.pattern ?? ""} />
+                    <input value={f.text} onChange={e => set({ text: e.target.value })} placeholder={hint} />
                   )}
+                  {inp.type.startsWith("map(") && def && f.mode === "value" && <div className="small muted">Your keys are added to the default map; yours win on conflicts.</div>}
                 </div>
               );
             })}

@@ -7,32 +7,35 @@ import { ErrorBox, Loading, go, useLoad, lazyPage } from "../../ui";
 const GitHub = lazyPage(() => import("./GitHub"));
 const Cloud = lazyPage(() => import("./Cloud"));
 const Slack = lazyPage(() => import("./Slack"));
+const Secrets = lazyPage(() => import("./Secrets"));
 
-type Tab = "github" | "cloud" | "slack";
+type Tab = "github" | "cloud" | "slack" | "secrets";
 type Provider = "" | "aws" | "gcp" | "azure";
 
 // Routes: integrations/github, integrations/cloud[/aws|gcp|azure].
 export default function Integrations({ ctx, route }: { ctx: Ctx; route: string[] }) {
   const admin = has(ctx.t, "tenant_admin");
-  const tab: Tab = !admin ? "cloud" : route[0] === "cloud" ? "cloud" : route[0] === "slack" ? "slack" : "github";
+  const tab: Tab = !admin ? "cloud" : route[0] === "cloud" ? "cloud" : route[0] === "slack" ? "slack" : route[0] === "secrets" ? "secrets" : "github";
   const provider = (["aws", "gcp", "azure"].includes(route[1]) ? route[1] : "") as Provider;
   const base = `t/${ctx.t.slug}/integrations`;
 
   return (
     <>
       <div className="head"><div><h1>Integrations</h1>
-        <div className="muted">{ctx.t.name}’s connections to Git and to clouds. Everything here belongs to this tenant only and is stored in its own backend.</div></div></div>
+        <div className="muted">{ctx.t.name}’s connections to Git, clouds, Slack and its secret store. Everything here belongs to this tenant only and is stored in its own backend.</div></div></div>
 
       <div className="tabs" role="tablist" aria-label="Integration type">
         {admin && <TabButton on={tab === "github"} onClick={() => go(`${base}/github`)} title="GitHub"><GitHubSummary ctx={ctx} /></TabButton>}
         <TabButton on={tab === "cloud"} onClick={() => go(`${base}/cloud`)} title="Cloud (AWS · GCP · Azure)"><CloudSummary ctx={ctx} /></TabButton>
         {admin && <TabButton on={tab === "slack"} onClick={() => go(`${base}/slack`)} title="Slack"><SlackSummary ctx={ctx} /></TabButton>}
+        {admin && <TabButton on={tab === "secrets"} onClick={() => go(`${base}/secrets`)} title="Secret store"><SecretsSummary ctx={ctx} /></TabButton>}
       </div>
 
       {/* keyed by tenant so nothing carries over when the tenant changes */}
       <Suspense fallback={<Loading />} key={ctx.t.slug}>
         {tab === "github" ? <GitHub ctx={ctx} />
           : tab === "slack" ? <Slack ctx={ctx} />
+          : tab === "secrets" ? <Secrets ctx={ctx} />
           : <Cloud ctx={ctx} provider={provider} setProvider={p => go(`${base}/cloud${p ? "/" + p : ""}`)} />}
       </Suspense>
     </>
@@ -68,4 +71,10 @@ function SlackSummary({ ctx }: { ctx: Ctx }) {
   const s = useLoad(ctx.api.slack, [ctx.t.slug]);
   if (!s.data) return <>…</>;
   return <>{s.data.configured ? (s.data.interactive ? "alerts + approvals" : "alerts") : "not connected"}</>;
+}
+
+function SecretsSummary({ ctx }: { ctx: Ctx }) {
+  const s = useLoad(ctx.api.secretStore, [ctx.t.slug]);
+  if (!s.data) return <>…</>;
+  return <>{s.data.configured ? new URL(s.data.config!.address).host : "not connected"}</>;
 }
