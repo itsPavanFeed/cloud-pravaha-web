@@ -88,7 +88,7 @@ function ConnectionDetail({ ctx, id }: { ctx: Ctx; id: string }) {
           <dl className="kv">
             <dt>Issuer URL</dt><dd className="mono">{oidc.issuer} <Copy text={oidc.issuer} /></dd>
             <dt>Audience</dt><dd className="mono">{oidc.audience} <Copy text={oidc.audience} /></dd>
-            <dt>Subject</dt><dd className="mono">pravaha:env:ENV:stack:STACK:phase:PHASE<div className="muted small">Scope the trust policy to the environments and stacks this account may serve (PHASE is plan or apply).</div></dd>
+            <dt>Subject</dt><dd className="mono">pravaha:entity:ENTITY:env:ENV:stack:STACK:phase:PHASE<div className="muted small">Scope the trust policy to the products, environments and stacks this account may serve (PHASE is plan or apply).</div></dd>
           </dl>
         </>
       )}

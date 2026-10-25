@@ -213,7 +213,6 @@ export const tenant = (t: string) => {
       call<{ valid: boolean; problems?: string[]; files?: Record<string, string>; providers?: string[]; hash?: string }>("POST", p("/stacks/preview"), s),
     stackRuns: (id: string) => call<Run[]>("GET", p(`/stacks/${id}/runs`)),
     stateVersions: (id: string) => call<StateVersion[]>("GET", p(`/stacks/${id}/state-versions`)),
-    setDrift: (stackId: string, d: { interval_minutes: number; auto_remediate: boolean }) => call<Stack>("PUT", p(`/stacks/${stackId}/drift`), d),
     createRun: (stackId: string, operation: "apply" | "destroy" | "drift") => call<Run>("POST", p(`/stacks/${stackId}/runs`), { operation }),
     runs: () => call<Run[]>("GET", p("/runs")),
     run: (id: string) => call<Run>("GET", p(`/runs/${id}`)),

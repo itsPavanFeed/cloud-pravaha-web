@@ -230,3 +230,5 @@ button.ghost.danger-text { color: var(--bad); }
 .empty-card { display: grid; justify-items: center; gap: 6px; text-align: center; padding: 40px 16px; }
 .empty-card .empty-icon { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 22px; }
 .empty-card h3 { margin: 4px 0 0; }
+.drift-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 12px; }
+.drift-choices > div { border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 4px; align-content: start; }

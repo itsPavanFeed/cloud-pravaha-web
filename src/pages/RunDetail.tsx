@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Ctx } from "../App";
 import { buRoles, canApprove, canChange, type LogChunk, type Step } from "../api";
-import { ErrorBox, Link, Loading, RiskBadge, Status, Time, useLoad } from "../ui";
+import { ErrorBox, Link, Loading, RiskBadge, Status, Time, go, useLoad } from "../ui";
 
 const active = ["queued", "planning", "apply_queued", "applying"];
 const stepLabel: Record<Step, string> = { manager: "Manager", finops: "FinOps", security: "Security" };
@@ -153,8 +153,20 @@ export default function RunDetail({ ctx, id }: { ctx: Ctx; id: string }) {
       {s?.drift && s.drift.length > 0 && (
         <div className="panel">
           <h2>Drift found</h2>
-          <p className="muted small">These resources were changed outside OpenTofu since the last apply.</p>
+          <p className="muted small">These resources were changed outside OpenTofu since the last apply. Nothing changes until you choose what to do.</p>
           <table><tbody>{s.drift.map(d => <tr key={d.address}><td className="mono small">{d.address}</td><td className="mono small">{d.type}</td><td className="chg">{d.actions.join(" → ")}</td></tr>)}</tbody></table>
+          <div className="drift-choices">
+            <div>
+              <strong>Revert the live resources to the code</strong>
+              <p className="small muted">Plans an apply of the current {run.pr_number ? "contract" : "stack"}; it goes through the usual risk-based approvals before anything changes.</p>
+              <button className="small" onClick={() => act(async () => { const r = await ctx.api.createRun(run.stack_id, "apply"); go(`t/${ctx.t.slug}/runs/${r.id}`); })}>Plan revert (code → live)</button>
+            </div>
+            <div>
+              <strong>Keep the live change</strong>
+              <p className="small muted">Update the stack (or its contract in Git) so the code matches the live resources, then plan it; the plan should show no changes.</p>
+              <button className="ghost small" onClick={() => go(`t/${ctx.t.slug}/stacks/${run.stack_id}`)}>Open the stack (live → code)</button>
+            </div>
+          </div>
         </div>
       )}
       {s && s.resources.length > 0 && (

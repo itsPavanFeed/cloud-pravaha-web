@@ -12,7 +12,6 @@ export default function StackDetail({ ctx, id }: { ctx: Ctx; id: string }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
   const [actionError, setActionError] = useState<unknown>(null);
-  const [drift, setDrift] = useState<{ interval_minutes: number; auto_remediate: boolean } | null>(null);
 
   if (!stack) return error ? <ErrorBox error={error} /> : <Loading />;
   const start = async (op: "apply" | "destroy" | "drift") => {
@@ -67,20 +66,8 @@ export default function StackDetail({ ctx, id }: { ctx: Ctx; id: string }) {
       </div>
 
       <div className="panel">
-        <h2>Drift detection</h2>
-        <p className="muted small">A drift check is a refresh-only plan: it compares the real infrastructure with state, changes nothing and needs no approvals. Auto-remediation queues a normal plan, which still needs the risk-based approvals.</p>
-        {(() => {
-          const d = drift ?? stack.drift;
-          return (
-            <div className="row">
-              <label className="row small" style={{ margin: 0, fontWeight: 400 }}>Check every
-                <input type="number" min={0} style={{ width: 90 }} value={d.interval_minutes} disabled={!canChange(ctx.t, stack.bu)} onChange={e => setDrift({ ...d, interval_minutes: Number(e.target.value) })} /> minutes (0 = off)</label>
-              <label className="row small" style={{ margin: 0, fontWeight: 400 }}><input type="checkbox" checked={d.auto_remediate} disabled={!canChange(ctx.t, stack.bu)} onChange={e => setDrift({ ...d, auto_remediate: e.target.checked })} /> auto-remediate</label>
-              {drift && <button className="small" onClick={async () => { setActionError(null); try { await api.setDrift(stack.id, drift); setDrift(null); reload(); } catch (e) { setActionError(e); } }}>Save</button>}
-              <span className="muted small">{stack.drift.last_check ? `last scheduled check ${new Date(stack.drift.last_check).toLocaleString()}` : "no scheduled checks yet"}</span>
-            </div>
-          );
-        })()}
+        <h2>Drift</h2>
+        <p className="muted small">Drift checks run only when someone starts one (Check drift above). A check is a refresh-only plan: it compares the live resources with the last apply, changes nothing and needs no approvals. When it finds drift, you decide on its result page: revert the live resources to the code, or keep the live change by updating the {stack.managed_by === "git" ? "contract" : "stack"}.</p>
       </div>
 
       <h2>Runs</h2>
