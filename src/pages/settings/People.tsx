@@ -6,8 +6,8 @@ import type { SectionProps } from "./Settings";
 const tenantRoles = ["tenant_admin", "finops", "security", "devops", "auditor"];
 const scopedRoles = ["admin", "manager", "developer", "viewer"];
 const roleHint: Record<string, string> = {
-  tenant_admin: "manages the tenant", finops: "signs the FinOps step", security: "signs the Security step",
-  devops: "approves releases, can override", auditor: "reads everything",
+  tenant_admin: "full control", finops: "signs the FinOps step", security: "signs the Security step",
+  devops: "full control; approves releases", auditor: "reads everything",
   admin: "manages the product or unit", manager: "signs the manager step", developer: "writes stacks, starts runs", viewer: "reads",
 };
 const PAGE = 15;
@@ -50,7 +50,7 @@ export default function People({ ctx, showSecret }: SectionProps) {
           <button onClick={() => setEditing({ email: "", grants: [{ role: "developer" }], isNew: true })}>+ Add person</button>
         </div>
       </div>
-      <p className="muted small">Tenant-wide roles apply everywhere; product roles apply to all of the product's business units. One person can hold several roles.</p>
+      <p className="muted small">tenant_admin and devops have full control: they manage the tenant, write stacks anywhere, sign any approval and can override. Other tenant-wide roles apply everywhere; product roles apply to all of the product's business units.</p>
       <ErrorBox error={error} />
       {editing && (
         <RoleEditor key={editing.email || "new"} initial={editing} entities={entities.data ?? []} bus={bus.data ?? []} self={ctx.me.user.email}

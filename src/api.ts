@@ -287,7 +287,7 @@ export const tenant = (t: string) => {
     proposeReleaseChange: (kind: "modules" | "policies", b: { title: string; body?: string; files: Record<string, string | null> }) =>
       call<Release>("POST", p(`/releases/${kind}/changes`), b),
     bundleCache: () => call<Record<string, number>>("GET", p("/releases/cache")),
-    secretStore: () => call<{ configured: boolean; config?: SecretStore; audience?: string; issuer: string; jwks_url: string }>("GET", p("/integrations/secret-store")),
+    secretStore: () => call<{ configured: boolean; config?: SecretStore; audience?: string; issuer: string; jwks_url: string; public_key_pem?: string }>("GET", p("/integrations/secret-store")),
     putSecretStore: (v: SecretStore) => call<SecretStore>("PUT", p("/integrations/secret-store"), v),
     deleteSecretStore: () => call<void>("DELETE", p("/integrations/secret-store")),
     testSecretStore: () => call<{ ok: boolean; status?: number; version?: string; error?: string }>("POST", p("/integrations/secret-store/test")),
@@ -300,12 +300,14 @@ export const tenant = (t: string) => {
 // ---- role helpers (UI hints only; the tenant plane enforces) ----
 
 // Platform admins hold tenant_admin and auditor in every tenant (but no approval roles).
+// tenant_admin and devops both have full control of the tenant.
+export const fullControl = (t: MeTenant | undefined) => !!t && (t.tenant_roles.includes("tenant_admin") || t.tenant_roles.includes("devops"));
 export const has = (t: MeTenant | undefined, ...roles: TenantRole[]) =>
-  !!t && roles.some(r => t.tenant_roles.includes(r) || (!!t.platform_admin && (r === "tenant_admin" || r === "auditor")));
+  !!t && roles.some(r => t.tenant_roles.includes(r) || (!!t.platform_admin && (r === "tenant_admin" || r === "auditor")) || ((r === "tenant_admin" || r === "devops") && fullControl(t)));
 export const allBUs = (t: MeTenant | undefined) => (t?.entities ?? []).flatMap(e => e.bus.map(b => ({ ...b, entity: e.slug, entityName: e.name })));
 export const buRoles = (t: MeTenant | undefined, bu: string) => allBUs(t).find(b => b.slug === bu)?.roles ?? [];
 export const canChange = (t: MeTenant | undefined, bu: string) =>
-  !!t?.platform_admin || buRoles(t, bu).some(r => r === "admin" || r === "developer");
+  !!t?.platform_admin || fullControl(t) || buRoles(t, bu).some(r => r === "admin" || r === "developer");
 export const canApprove = (t: MeTenant | undefined, step: Step, bu: string) =>
-  step === "manager" ? buRoles(t, bu).includes("manager") : !!t?.tenant_roles.includes(step as TenantRole);
+  fullControl(t) || (step === "manager" ? buRoles(t, bu).includes("manager") : !!t?.tenant_roles.includes(step as TenantRole));
 export const writableBUs = (t: MeTenant | undefined) => allBUs(t).filter(b => canChange(t, b.slug));

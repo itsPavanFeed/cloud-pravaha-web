@@ -19,12 +19,22 @@ export default function Secrets({ ctx }: { ctx: Ctx }) {
   const v = edit ?? saved ?? { address: "", auth_mount: "jwt", role: "pravaha", namespace: "", audience: "" };
   const aud = v.audience || "pravaha-vault";
   const mount = v.auth_mount || "jwt";
-  const setup = `# OpenBao / Vault: trust this tenant's issuer for runs (no Vault token is stored by the platform)
-bao auth enable -path=${mount} jwt
-bao write auth/${mount}/config oidc_discovery_url="${d.issuer}" bound_issuer="${d.issuer}"
-bao write auth/${mount}/role/${v.role || "pravaha"} role_type=jwt user_claim=sub \\
-    bound_audiences="${aud}" bound_claims_type=glob \\
-    bound_claims='{"sub":"pravaha:entity:*"}' token_ttl=15m token_policies=pravaha-read`;
+  const pemFile = `pravaha-${ctx.t.slug}-issuer.pem`;
+  const role = v.role || "pravaha";
+  const steps: { title: string; note: string; code: string }[] = [
+    { title: "1. Install the OpenBao CLI and point it at your server",
+      note: "On macOS: brew install openbao (the command is bao). The HashiCorp vault CLI works too: replace bao with vault. Use an admin token of your own; it is never given to Cloud Pravaha.",
+      code: `brew install openbao\nexport BAO_ADDR=${v.address || "https://bao.example.internal:8200"}\nexport BAO_TOKEN=<your admin token>\nbao status` },
+    { title: "2. A KV v2 secrets engine and a read-only policy for runs",
+      note: "Skip the first line if a kv engine already exists. Narrow the path to the secrets runs may read.",
+      code: `bao secrets enable -path=kv kv-v2\nbao policy write pravaha-read - <<'EOF'\npath "kv/data/*" { capabilities = ["read"] }\nEOF` },
+    { title: `3. Trust ${ctx.t.name}'s issuer (JWT auth)`,
+      note: "Save the public key below as " + pemFile + ". Using the key directly works even when OpenBao cannot reach the issuer. If OpenBao can reach it over trusted TLS, oidc_discovery_url=\"" + d.issuer + "\" is an alternative that follows key rotation.",
+      code: `bao auth enable -path=${mount} jwt\nbao write auth/${mount}/config bound_issuer="${d.issuer}" jwt_validation_pubkeys=@${pemFile}\nbao write auth/${mount}/role/${role} - <<'EOF'\n{"role_type": "jwt", "user_claim": "sub", "bound_audiences": ["${aud}"],\n "bound_claims_type": "glob", "bound_claims": {"sub": "pravaha:entity:*"},\n "token_ttl": "15m", "token_policies": ["pravaha-read"]}\nEOF` },
+    { title: "4. Store a secret and reference it from a contract",
+      note: "Contracts then use secretRef: vault://kv/payments/orders-db#password",
+      code: `bao kv put kv/payments/orders-db password='<the password>'` },
+  ];
 
   return (
     <>
@@ -62,14 +72,22 @@ bao write auth/${mount}/role/${v.role || "pravaha"} role_type=jwt user_claim=sub
         )}
       </div>
       <div className="panel">
-        <h2>Set up the store</h2>
-        <p className="muted small">Configure JWT auth to trust this tenant's issuer. The token's <span className="mono">sub</span> is <span className="mono">pravaha:entity:&lt;entity&gt;:env:&lt;env&gt;:stack:&lt;stack&gt;:phase:&lt;plan|apply&gt;</span>, so policies can be scoped to exactly the stacks that need a secret.</p>
-        <dl className="kv">
-          <dt>Issuer</dt><dd className="mono">{d.issuer} <Copy text={d.issuer} /></dd>
-          <dt>JWKS</dt><dd className="mono">{d.jwks_url} <Copy text={d.jwks_url} /></dd>
-        </dl>
-        <pre className="code">{setup}</pre>
-        <Copy text={setup} />
+        <h2>Set up OpenBao for {ctx.t.name}</h2>
+        <p className="muted small">Runs log in with a token whose <span className="mono">sub</span> is <span className="mono">pravaha:entity:&lt;entity&gt;:env:&lt;env&gt;:stack:&lt;stack&gt;:phase:&lt;plan|apply&gt;</span> and audience <span className="mono">{aud}</span>, so the role and policies can be narrowed to exactly the stacks that need a secret.</p>
+        {steps.map(st => (
+          <div key={st.title} style={{ marginBottom: 14 }}>
+            <div className="row" style={{ justifyContent: "space-between" }}><strong>{st.title}</strong><Copy text={st.code} /></div>
+            <p className="small muted" style={{ margin: "2px 0 6px" }}>{st.note}</p>
+            <pre className="code">{st.code}</pre>
+          </div>
+        ))}
+        {d.public_key_pem && (
+          <div>
+            <div className="row" style={{ justifyContent: "space-between" }}><strong>Issuer public key <span className="mono small muted">{pemFile}</span></strong><Copy text={d.public_key_pem} /></div>
+            <pre className="code">{d.public_key_pem}</pre>
+          </div>
+        )}
+        <dl className="kv"><dt>Issuer</dt><dd className="mono">{d.issuer}</dd><dt>JWKS</dt><dd className="mono">{d.jwks_url}</dd></dl>
       </div>
     </>
   );
