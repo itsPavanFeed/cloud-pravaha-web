@@ -3,7 +3,7 @@
 // /api/v1/t/{tenant}/..., which forwards to that tenant's own backend.
 // The token lives in sessionStorage only, so it is gone when the tab closes.
 
-export type TenantRole = "tenant_admin" | "finops" | "security" | "auditor";
+export type TenantRole = "tenant_admin" | "finops" | "security" | "devops" | "auditor";
 export type EntityRole = "admin" | "manager" | "developer" | "viewer";
 export type Step = "manager" | "finops" | "security";
 
@@ -18,7 +18,7 @@ export interface CatalogInput {
   pattern?: string; item_pattern?: string; allowed?: unknown[]; min?: number; max?: number; max_items?: number;
 }
 export interface CatalogModule {
-  id: string; kind: string; title: string; description: string; source: string; versions: string[]; cloud: string;
+  id: string; kind: string; title: string; file?: string; description: string; source: string; versions: string[]; cloud: string;
   providers: string[]; inputs: CatalogInput[]; enforced?: Record<string, unknown>; outputs: string[];
   dependencies?: { source: string; versions: string[] }[];
 }
@@ -37,12 +37,16 @@ export interface ReleaseManifest {
   packages?: Record<string, { dir: string; origin: string; sha256: string; files: number; bytes: number; deps?: string[] }>;
   policies?: { name: string; scope: string; level: string; description?: string; file: string; tests: number }[];
 }
+export interface ReleaseApproval { approver: string; decision: "approve" | "reject"; reason?: string; created_at: string }
 export interface Release {
-  id: string; kind: "modules" | "policies"; number: number; revision: string; status: "building" | "failed" | "ready" | "active" | "superseded";
+  id: string; kind: "modules" | "policies"; number: number; revision: string;
+  status: "building" | "failed" | "ready" | "pending" | "active" | "superseded" | "discarded";
   checks: ReleaseCheck[]; manifest?: ReleaseManifest; sha256?: string; size?: number; error?: string;
   created_by: string; created_at: string; finished_at?: string; deployed_by?: string; deployed_at?: string;
+  origin: "branch" | "pr" | "console"; ref?: string; pr_number?: number; pr_url?: string; title?: string;
+  requested_by?: string; requested_at?: string; merge_sha?: string; merge_error?: string; approvals: ReleaseApproval[];
 }
-export interface ReleaseSource { provider: "github" | "gitlab" | "local"; repo: string; branch: string; path: string; api_url?: string; auth?: "token" | "github_app"; poll_seconds: number; enabled: boolean; auto_deploy: boolean }
+export interface ReleaseSource { provider: "github" | "gitlab" | "local"; repo: string; branch: string; path: string; api_url?: string; auth?: "token" | "github_app"; poll_seconds: number; enabled: boolean; approvals: number }
 export interface SecretStore { address: string; auth_mount?: string; role: string; namespace?: string; audience?: string }
 
 export interface Connection { id: string; name: string; cloud: { provider: string; auth?: string; [k: string]: unknown }; entities: string[]; created_by: string; created_at: string }
@@ -96,7 +100,7 @@ export interface Runner { id: string; name: string; pool: string; created_at: st
 export interface StateVersion { serial: number; sha256: string; size: number; run_id?: string; created_at: string }
 export interface Tenant { id: string; slug: string; name: string; backend_url: string; created_by: string; created_at: string }
 export interface Entity { id: string; slug: string; name: string; created_by: string; created_at: string }
-export interface PolicySet { id: string; name: string; scope: string; level: "hard" | "advisory"; module: string; enabled: boolean; created_by: string; updated_by: string; updated_at: string }
+export interface PolicySet { id: string; name: string; scope: string; level: "hard" | "advisory"; module: string; enabled: boolean; source?: "console" | "release"; created_by: string; updated_by: string; updated_at: string }
 export interface BU { id: string; slug: string; name: string; entity: string; created_by: string; created_at: string }
 export interface Membership { id: string; email: string; tenant: string; entity?: string; bu?: string; role: string; created_by: string; created_at: string }
 
@@ -165,6 +169,9 @@ export const central = {
   createBU: (t: string, slug: string, name: string, entity: string) => call<BU>("POST", `/api/v1/tenants/${t}/bus`, { slug, name, entity }),
   addMember: (t: string, m: { email: string; role: string; entity?: string; bu?: string }) => call<Membership>("POST", `/api/v1/tenants/${t}/members`, m),
   removeMember: (t: string, id: string) => call<void>("DELETE", `/api/v1/tenants/${t}/members/${id}`),
+  setUserRoles: (t: string, email: string, roles: { role: string; entity?: string; bu?: string }[]) =>
+    call<Membership[]>("PUT", `/api/v1/tenants/${t}/users/${encodeURIComponent(email)}/roles`, { roles }),
+  approvers: (t: string) => call<{ tenant: Record<string, string[]>; entity_managers: Record<string, string[]>; bu_managers: Record<string, string[]> }>("GET", `/api/v1/tenants/${t}/approvers`),
   slackApp: (t: string) => call<{ configured: boolean; interactivity_url: string; updated_by?: string; updated_at?: string }>("GET", `/api/v1/tenants/${t}/slack`),
   putSlackApp: (t: string, b: { signing_secret: string; bot_token: string }) => call<unknown>("PUT", `/api/v1/tenants/${t}/slack`, b),
   deleteSlackApp: (t: string) => call<void>("DELETE", `/api/v1/tenants/${t}/slack`),
@@ -212,6 +219,8 @@ export const tenant = (t: string) => {
     run: (id: string) => call<Run>("GET", p(`/runs/${id}`)),
     logs: (id: string, after: number) => call<LogChunk[]>("GET", p(`/runs/${id}/logs?after=${after}`)),
     approve: (id: string, step: Step, reason: string) => call<Run>("POST", p(`/runs/${id}/approve`), { step, reason }),
+    overrideRun: (id: string, reason: string) => call<Run>("POST", p(`/runs/${id}/override`), { reason }),
+    overrideRelease: (kind: "modules" | "policies", id: string, reason: string) => call<Release>("POST", p(`/releases/${kind}/${id}/override`), { reason }),
     discard: (id: string, reason: string) => call<Run>("POST", p(`/runs/${id}/discard`), { reason }),
     audit: (q: string) => call<AuditEvent[]>("GET", p(`/audit?limit=200&q=${encodeURIComponent(q)}`)),
     verifyAudit: () => call<{ intact: boolean; checked: number; first_broken_id: number }>("GET", p("/audit/verify")),
@@ -269,7 +278,14 @@ export const tenant = (t: string) => {
     putReleaseSource: (kind: "modules" | "policies", c: ReleaseSource) => call<ReleaseSource>("PUT", p(`/releases/${kind}/source`), c),
     putReleaseToken: (kind: "modules" | "policies", token: string) => call<void>("PUT", p(`/releases/${kind}/source/token`), { token }),
     buildRelease: (kind: "modules" | "policies") => call<Release>("POST", p(`/releases/${kind}/builds`)),
-    deployRelease: (kind: "modules" | "policies", id: string) => call<Release>("POST", p(`/releases/${kind}/${id}/deploy`)),
+    requestRelease: (kind: "modules" | "policies", id: string) => call<Release>("POST", p(`/releases/${kind}/${id}/request`)),
+    approveRelease: (kind: "modules" | "policies", id: string, reason: string) => call<Release>("POST", p(`/releases/${kind}/${id}/approve`), { reason }),
+    rejectRelease: (kind: "modules" | "policies", id: string, reason: string) => call<Release>("POST", p(`/releases/${kind}/${id}/reject`), { reason }),
+    mergeRelease: (kind: "modules" | "policies", id: string) => call<Release>("POST", p(`/releases/${kind}/${id}/merge`)),
+    releaseFile: (kind: "modules" | "policies", path: string) =>
+      call<{ path: string; revision: string; exists: boolean; content?: string }>("GET", p(`/releases/${kind}/files?path=${encodeURIComponent(path)}`)),
+    proposeReleaseChange: (kind: "modules" | "policies", b: { title: string; body?: string; files: Record<string, string | null> }) =>
+      call<Release>("POST", p(`/releases/${kind}/changes`), b),
     bundleCache: () => call<Record<string, number>>("GET", p("/releases/cache")),
     secretStore: () => call<{ configured: boolean; config?: SecretStore; audience?: string; issuer: string; jwks_url: string }>("GET", p("/integrations/secret-store")),
     putSecretStore: (v: SecretStore) => call<SecretStore>("PUT", p("/integrations/secret-store"), v),

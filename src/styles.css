@@ -213,3 +213,20 @@ tr.clickable:hover td { background: var(--idle-soft); }
 .kind-foot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; align-items: start; }
 .kind-foot .panel { margin: 0; }
 @media (max-width: 900px) { .kind-foot { grid-template-columns: 1fr; } }
+/* approvals */
+.approval { display: grid; gap: 10px; }
+.approval-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.approval .steps { display: flex; gap: 8px; flex-wrap: wrap; }
+.step-card { display: grid; gap: 2px; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 8px; min-width: 200px; flex: 1 1 200px; }
+.step-card.done { border-style: solid; border-color: var(--ok); }
+strong.who { font-weight: 600; color: var(--text); }
+.danger-text { color: var(--bad); }
+.override { flex: 1 1 100%; }
+.override input { flex: 1; min-width: 240px; }
+.role-chip { display: inline-flex; gap: 4px; align-items: baseline; padding: 3px 9px; margin: 2px 6px 2px 0; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; background: var(--panel); white-space: nowrap; }
+.actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: nowrap; }
+button.ghost.danger-text { color: var(--bad); }
+.actions button { white-space: nowrap; }
+.empty-card { display: grid; justify-items: center; gap: 6px; text-align: center; padding: 40px 16px; }
+.empty-card .empty-icon { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 22px; }
+.empty-card h3 { margin: 4px 0 0; }

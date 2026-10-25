@@ -12,6 +12,7 @@ const Audit = lazyPage(() => import("./pages/Audit"));
 const Platform = lazyPage(() => import("./pages/Platform"));
 const Account = lazyPage(() => import("./pages/Account"));
 const Policies = lazyPage(() => import("./pages/Policies"));
+const Approvals = lazyPage(() => import("./pages/Approvals"));
 const Assistant = lazyPage(() => import("./pages/Assistant"));
 const Integrations = lazyPage(() => import("./pages/integrations/Integrations"));
 const Settings = lazyPage(() => import("./pages/settings/Settings"));
@@ -79,6 +80,7 @@ export default function App() {
     case "environments": body = <Settings ctx={ctx} section="organisation" />; break; // old link
     case "connections": body = <Integrations ctx={ctx} route={["cloud"]} />; break; // old link
     case "policies": body = <Policies ctx={ctx} />; break;
+    case "approvals": body = <Approvals ctx={ctx} />; break;
     case "audit": body = <Audit ctx={ctx} />; break;
     case "settings": body = <Settings ctx={ctx} section={id} route={route.slice(4)} />; break;
     case "assistant": body = <Assistant ctx={ctx} />; break;
@@ -87,7 +89,7 @@ export default function App() {
   }
 
   const nav: [string, string, boolean][] = t ? [
-    ["stacks", "Stacks", true], ["runs", "Runs", true], ["catalog", "Kinds & defaults", true],
+    ["stacks", "Stacks", true], ["runs", "Runs", true], ["approvals", "Approvals", true], ["catalog", "Kinds & defaults", true],
     ["integrations", "Integrations", true], ["policies", "Policies", true], ["audit", "Audit log", true], ["assistant", "Assistant", true],
     ["settings", "Tenant settings", !!ctx && canOpenSettings(ctx)],
   ] : [];
